@@ -15,6 +15,8 @@ try {
   throw "Couldn't retrieve word lists from files.";
 }
 
+export const englishDictionary = dictionaryString;
+
 // TODO holy copy-paste batman
 
 export function is1Related(word) {
