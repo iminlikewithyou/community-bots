@@ -164,6 +164,41 @@ export async function joinRegularRuleLottery(user): Promise<RuleLotteryEntry> {
   return null;
 }
 
+type RegularRule = {
+  author: string,
+  ruleNumber: number,
+  ruleText: string,
+  subrules?: RegularRule[],
+  timestamp: number
+}
+
+export async function getRegularRule(ruleNumber) {
+  let rule = await client
+    .db(dbName)
+    .collection("regular_rules")
+    .find({ ruleNumber })
+    .limit(1)
+    .toArray();
+  if (rule.length === 0) return null;
+  return rule[0];
+}
+
+export async function getRegularRuleTotalCharacterLength(ruleNumber) {
+  let rule = await getRegularRule(ruleNumber);
+  if (!rule) return 0;
+  let ruleTextLength = ("- " + ruleNumber + ".").length;
+  let totalLength = rule.ruleText.length + ruleTextLength;
+  if (rule.subrules) {
+    for (let i = 0; i < rule.subrules.length; i++) {
+      // totalLength += await getRegularRuleTotalCharacterLength(rule.subrules[i].ruleNumber);
+      totalLength += rule.subrules[i].ruleText.length + 2 + 2; // space before the dash and the extra letter, and the new line
+    }
+  }
+  return totalLength;
+}
+
+
+
 export async function getProfile(user) {
   let profile = await client
     .db(dbName)
