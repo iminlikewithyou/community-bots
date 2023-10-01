@@ -36,7 +36,7 @@ export async function execute(interaction: CommandInteraction, preferBroadcast: 
     "Character Count",
     (
       "\n> " + (query.length > 300 ? escapeDiscordMarkdown(query.slice(0, 298) + "..") : escapeDiscordMarkdown(query)) +
-      "\n• **" + formatNumber(characterCount) + " characters**" + (whitespaceCount === 0 ? "." : " - " + formatNumber(characterCount - whitespaceCount) + " ignoring whitespace.")
+      "\n- **" + formatNumber(characterCount) + " characters**" + (whitespaceCount === 0 ? "." : " - " + formatNumber(characterCount - whitespaceCount) + " ignoring whitespace.")
     ),
     preferBroadcast
   );

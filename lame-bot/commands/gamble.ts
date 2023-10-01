@@ -27,7 +27,7 @@ export async function execute(interaction: CommandInteraction, preferBroadcast: 
     await replyToInteraction(
       interaction,
       "Gamble",
-      "\n• You don't have enough cash for that. You have " + formatNumber(userCash) + " cash.",
+      "\n- You don't have enough cash for that. You have " + formatNumber(userCash) + " cash.",
       false
     );
     return;

@@ -34,17 +34,17 @@ export async function execute(interaction: CommandInteraction, preferBroadcast: 
     let solveCount = solutions.length;
 
     if (solveCount === 0) {
-      await replyToInteraction(interaction, "Solve Count", "\n• That prompt is impossible.", preferBroadcast);
+      await replyToInteraction(interaction, "Solve Count", "\n- That prompt is impossible.", preferBroadcast);
     } else {
       await replyToInteraction(interaction, "Solve Count",
-        '\n• There '
+        '\n- There '
         + (solutions.length === 1 ? 'is **1** solution' : 'are **' + formatNumber(solutions.length) + '** solutions')
         + ' for ' + getPromptRegexDisplayText(regex) + '.'
       , preferBroadcast);
     }
   } catch (error) {
     if (error.name === 'PromptException' || error.name === 'SolveWorkerException') {
-      await replyToInteraction(interaction, "Solve Count", "\n• " + error.message, preferBroadcast);
+      await replyToInteraction(interaction, "Solve Count", "\n- " + error.message, preferBroadcast);
     } else {
       throw error;
     }

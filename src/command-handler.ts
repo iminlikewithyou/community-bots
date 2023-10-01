@@ -189,7 +189,7 @@ export function registerClientAsCommandHandler(client: Client, commandFolder: st
       replyToInteraction(
         interaction,
         "Limit",
-        "\n• You've used this command too much! You can use it again in " + secondsToEnglish(timeLeft) + ".",
+        "\n- You've used this command too much! You can use it again in " + secondsToEnglish(timeLeft) + ".",
         false
       );
       return;
@@ -201,7 +201,7 @@ export function registerClientAsCommandHandler(client: Client, commandFolder: st
       replyToInteraction(
         interaction,
         "Cooldown",
-        "\n• Hold on! You can use this command again in " + timeLeft + (timeLeft === 1 ? " second." : " seconds."),
+        "\n- Hold on! You can use this command again in " + timeLeft + (timeLeft === 1 ? " second." : " seconds."),
         false
       );
       return;
@@ -211,14 +211,14 @@ export function registerClientAsCommandHandler(client: Client, commandFolder: st
         replyToInteraction(
           interaction,
           "Cooldown",
-          "\n• Hold on! You can use another command in " + timeLeft + (timeLeft === 1 ? " second." : " seconds."),
+          "\n- Hold on! You can use another command in " + timeLeft + (timeLeft === 1 ? " second." : " seconds."),
           false
         );
       } else {
         replyToInteraction(
           interaction,
           "Cooldown",
-          "\n• Hold on! You're sending commands too quickly!",
+          "\n- Hold on! You're sending commands too quickly!",
           false
         );
       }
@@ -236,7 +236,7 @@ export function registerClientAsCommandHandler(client: Client, commandFolder: st
       await replyToInteraction(
         interaction,
         "Error",
-        "\n• Sorry, an error occurred while running that command.",
+        "\n- Sorry, an error occurred while running that command.",
         preferBroadcast
       );
     }

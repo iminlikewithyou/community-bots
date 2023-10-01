@@ -114,7 +114,7 @@ async function startRound() {
     (
       getRemarkEmoji("bomb") + " **Quick!** Type a word containing:" +
       "\n\n" + getPromptRegexDisplayText(prompt) + " ***｡✲ﾟ** (" + formatNumber(solutions) + (solutions === 1 ? " solution)" : " solutions)") +
-      (lengthRequired ? "\n\n• Must be **" + promptWord.length + "** characters!" : "")
+      (lengthRequired ? "\n\n- Must be **" + promptWord.length + "** characters!" : "")
     )
   );
 
