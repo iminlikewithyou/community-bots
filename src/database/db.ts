@@ -46,6 +46,124 @@ export async function getSolutionCount(solution) {
   return count;
 }
 
+export async function getRegularRuleState() {
+  /*
+    stored in lame/regular_rules_state as a single document
+    
+    regular rules state document properties:
+    
+    lastLottery: timestamp (last time the lottery was run)
+    lastWinner: discord user id (last winner of the lottery)
+    ruleAdded: boolean (whether a new rule was added since the last lottery)
+    highestRuleNumber: number (highest rule number - new rules will be added with this number + 1)
+    lottery: array of objects (each object has a discord user id and the amount of entries they have)
+  */
+
+  let regularRulesState = await client
+    .db(dbName)
+    .collection("regular_rules_state")
+    .find({})
+    .limit(1)
+    .toArray();
+  
+  if (regularRulesState.length === 0) {
+    await client
+      .db(dbName)
+      .collection("regular_rules_state")
+      .insertOne({
+        lastLottery: 0,
+        lastWinner: null,
+        ruleAdded: false,
+        highestRuleNumber: 0,
+        lottery: []
+      });
+    
+    regularRulesState = await client
+      .db(dbName)
+      .collection("regular_rules_state")
+      .find({})
+      .limit(1)
+      .toArray();
+  }
+
+  return regularRulesState[0];
+}
+
+export async function doRegularRuleLottery() {
+  let regularRulesState = await getRegularRuleState();
+
+  let lottery = regularRulesState.lottery;
+  let totalEntries = lottery.reduce((total, entry) => total + entry.entries, 0);
+  let roll = Math.floor(Math.random() * totalEntries);
+  let currentRoll = 0;
+
+  let winner = null;
+  for (let i = 0; i < lottery.length; i++) {
+    currentRoll += lottery[i].entries;
+    if (currentRoll > roll) {
+      winner = lottery[i].user;
+    }
+  }
+
+  // remove the winner from the lottery and give everyone else 1 more entry to give them a greater chance of winning next time
+  lottery = lottery.filter(entry => entry.user !== winner);
+  lottery = lottery.map(entry => {
+    entry.entries++;
+    return entry;
+  });
+
+  await client
+    .db(dbName)
+    .collection("regular_rules_state")
+    .updateOne({}, {
+      $set: {
+        lastLottery: Date.now(),
+        lastWinner: winner,
+        ruleAdded: false,
+        lottery
+      }
+    });
+
+  return winner;
+}
+
+type RuleLotteryEntry = {
+  user: string,
+  entries: number,
+  joinedAt: number,
+  totalEntries?: number
+};
+
+export async function joinRegularRuleLottery(user): Promise<RuleLotteryEntry> {
+  let regularRulesState = await getRegularRuleState();
+
+  let lottery = regularRulesState.lottery;
+
+  let userEntry = lottery.find(entry => entry.user === user);
+  if (userEntry) {
+    // add totalEntries property to userEntry
+    userEntry.totalEntries = lottery.reduce((total, entry) => total + entry.entries, 0);
+    return userEntry;
+  }
+
+  lottery.push({
+    user,
+    entries: 1,
+    joinedAt: Date.now()
+  });
+
+  await client
+    .db(dbName)
+    .collection("regular_rules_state")
+    .updateOne({}, {
+      $set: {
+        lottery
+      }
+    });
+
+  return null;
+}
+
 export async function getProfile(user) {
   let profile = await client
     .db(dbName)
