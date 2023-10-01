@@ -1,6 +1,7 @@
 import { Client, Collection, CommandInteraction, Events, GuildMember, GuildTextBasedChannel, Routes } from "discord.js";
 import { REST } from "@discordjs/rest";
 import fs from "node:fs";
+import { createRule } from "./createRule";
 
 const COOLDOWN_TIME = 2000;
 const commandCooldown = new Map();
@@ -167,6 +168,15 @@ export function registerClientAsCommandHandler(client: Client, commandFolder: st
       console.error(error);
     }
   })();
+
+  // temporary modal handler - we can create modal files at some point
+  client.on(Events.InteractionCreate, async (interaction) => {
+    if (!interaction.isModalSubmit()) return;
+
+    if (interaction.customId === "createRule") {
+      createRule(interaction);
+    }
+  });
 
   client.on(Events.InteractionCreate, async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
