@@ -1,4 +1,5 @@
 import { MongoClient } from "mongodb";
+import { escapeDiscordMarkdown } from "../utils";
 
 // Connection URL
 const url = process.env.MONGO_URL;
@@ -93,7 +94,7 @@ export async function doRegularRuleLottery() {
   let regularRulesState = await getRegularRuleState();
 
   let lottery = regularRulesState.lottery;
-  let totalEntries = lottery.reduce((total, entry) => total + entry.entries, 0);
+  let totalEntries = lottery.reduce((total: number, entry: RuleLotteryEntry) => total + entry.entries, 0);
   let roll = Math.floor(Math.random() * totalEntries);
   let currentRoll = 0;
 
@@ -106,8 +107,8 @@ export async function doRegularRuleLottery() {
   }
 
   // remove the winner from the lottery and give everyone else 1 more entry to give them a greater chance of winning next time
-  lottery = lottery.filter(entry => entry.user !== winner);
-  lottery = lottery.map(entry => {
+  lottery = lottery.filter((entry: RuleLotteryEntry) => entry.user !== winner);
+  lottery = lottery.map((entry: RuleLotteryEntry) => {
     entry.entries++;
     return entry;
   });
@@ -130,74 +131,99 @@ export async function doRegularRuleLottery() {
 type RuleLotteryEntry = {
   user: string,
   entries: number,
-  joinedAt: number,
-  totalEntries?: number
+  joinedAt: number
 };
 
-export async function joinRegularRuleLottery(user): Promise<RuleLotteryEntry> {
+type LotteryEntryResult = {
+  currentEntry: RuleLotteryEntry,
+  totalEntries: number,
+}
+
+export async function joinRegularRuleLottery(user): Promise<LotteryEntryResult> {
   let regularRulesState = await getRegularRuleState();
 
   let lottery = regularRulesState.lottery;
 
   let userEntry = lottery.find(entry => entry.user === user);
+  let totalEntries = lottery.reduce((total, entry) => total + entry.entries, 0);
+  
   if (userEntry) {
-    // add totalEntries property to userEntry
-    userEntry.totalEntries = lottery.reduce((total, entry) => total + entry.entries, 0);
-    return userEntry;
+    return {
+      currentEntry: userEntry,
+      totalEntries
+    };
   }
 
-  lottery.push({
+  let newEntry = {
     user,
     entries: 1,
     joinedAt: Date.now()
-  });
+  };
 
   await client
     .db(dbName)
     .collection("regular_rules_state")
     .updateOne({}, {
-      $set: {
-        lottery
+      $push: {
+        lottery: newEntry
       }
     });
 
-  return null;
+  return {
+    currentEntry: null,
+    totalEntries
+  }
 }
 
 type RegularRule = {
   author: string,
-  ruleNumber: number,
+  ruleID: string,
   ruleText: string,
-  subrules?: RegularRule[],
+  subrules?: string[],
+  highestSubruleNumber?: number,
   timestamp: number
 }
 
-export async function getRegularRule(ruleNumber) {
+export async function getRegularRule(ruleID: string): Promise<RegularRule> {
   let rule = await client
     .db(dbName)
     .collection("regular_rules")
-    .find({ ruleNumber })
+    .find({ ruleID })
     .limit(1)
     .toArray();
   if (rule.length === 0) return null;
-  return rule[0];
+  return rule[0] as unknown as RegularRule; // what
 }
 
-export async function getRegularRuleTotalCharacterLength(ruleNumber) {
-  let rule = await getRegularRule(ruleNumber);
-  if (!rule) return 0;
-  let ruleTextLength = ("- " + ruleNumber + ".").length;
-  let totalLength = rule.ruleText.length + ruleTextLength;
-  if (rule.subrules) {
-    for (let i = 0; i < rule.subrules.length; i++) {
-      // totalLength += await getRegularRuleTotalCharacterLength(rule.subrules[i].ruleNumber);
-      totalLength += rule.subrules[i].ruleText.length + 2 + 2; // space before the dash and the extra letter, and the new line
-    }
+// ruleID is the rule number + any subrule letters
+// subrules is an array of ruleIDs
+
+export async function getRegularRuleString(ruleID: string, highlightRuleID: string = null, highlightString: string = "this is the rule", indentSpaces = 0) {
+  let rule = await getRegularRule(ruleID);
+  if (!rule) return null;
+
+  // put spaces before the rule text to indent it
+  let ruleString = " ".repeat(indentSpaces) + "- **" + ruleID + ".** " + escapeDiscordMarkdown(rule.ruleText);
+  if (ruleID === highlightRuleID) {
+    ruleString += "\n" + " ".repeat(indentSpaces) + "- ☝️ *.." + highlightString + "!*";
   }
-  return totalLength;
+
+  for (let i = 0; i < rule.subrules.length; i++) {
+    let subruleID = rule.subrules[i];
+    ruleString += "\n" + await getRegularRuleString(subruleID, highlightRuleID, highlightString, indentSpaces + 1);
+  }
+
+  return ruleString;
 }
 
+export async function getRegularRuleTotalCharacterLength(ruleID: string) {
+  let ruleString = await getRegularRuleString(ruleID);
+  return ruleString.length;
+}
 
+export function getLetterBasedNumber(letter: string) {
+  return "abcdefghijklmnopqrstuvwxyz".indexOf(letter.toLowerCase()) + 1;
+}
 
 export async function getProfile(user) {
   let profile = await client
