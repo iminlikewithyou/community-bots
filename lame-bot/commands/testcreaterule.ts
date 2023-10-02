@@ -9,7 +9,7 @@ export async function execute(interaction: CommandInteraction, preferBroadcast: 
   
   const modal = new ModalBuilder()
     .setCustomId("createRule")
-    .setTitle("Create Rule");
+    .setTitle("Create a Regular Rule");
 
   // Add components
 
@@ -27,15 +27,24 @@ export async function execute(interaction: CommandInteraction, preferBroadcast: 
     .setLabel("Rule text")
     .setPlaceholder("What's the rule?")
     .setStyle(TextInputStyle.Paragraph)
-    .setMinLength(6)
+    .setMinLength(4)
     .setMaxLength(300)
     .setRequired(true);
   
+  const noteTextInput = new TextInputBuilder()
+    .setCustomId("ruleNote")
+    .setLabel("Note")
+    .setPlaceholder("Anything else to say to the people?")
+    .setStyle(TextInputStyle.Paragraph)
+    .setMaxLength(300)
+    .setRequired(false);
+  
   const actionRow1 = new ActionRowBuilder<ModalActionRowComponentBuilder>().addComponents(ruleToAddInput);
   const actionRow2 = new ActionRowBuilder<ModalActionRowComponentBuilder>().addComponents(ruleTextInput);
+  const actionRow3 = new ActionRowBuilder<ModalActionRowComponentBuilder>().addComponents(noteTextInput);
 
   // Add components to modal
-  modal.addComponents(actionRow1, actionRow2);
+  modal.addComponents(actionRow1, actionRow2, actionRow3);
 
   // Show the modal to the user
   await interaction.showModal(modal);
