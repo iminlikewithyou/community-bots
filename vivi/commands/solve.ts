@@ -42,7 +42,7 @@ export const broadcastable = true;
 
 // create function to handle the command
 export async function execute(interaction: CommandInteraction, preferBroadcast: boolean) {
-  let prompt = cleanWord(interaction.options.get("prompt").value);
+  let prompt = cleanWord(interaction.options.get("prompt", true).value);
   // @ts-ignore
   let sorting: string = interaction.options.get("sorting")?.value ?? "None";
 
@@ -76,7 +76,7 @@ export async function execute(interaction: CommandInteraction, preferBroadcast: 
     } else {
       shuffle(solutions);
 
-      let solutionStrings = [];
+      let solutionStrings: string[] = [];
       let solutionsLength = 0;
 
       for (let i = 0; i < Math.min(solutions.length, 4); i++) {
