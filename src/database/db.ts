@@ -10,6 +10,17 @@ const client = new MongoClient(url, {
 
 // Database Name
 const dbName = "lame";
+const rpName = "regular-place";
+
+export async function storeDiscordTokens(userId, tokens) {
+  await client.db(rpName).collection("profiles").updateOne({ userId }, { $set: tokens }, { upsert: true });
+}
+
+export async function getDiscordTokens(userId) {
+  let profile = await client.db(rpName).collection("profiles").find({ userId }).limit(1).toArray();
+  if (profile.length === 0) return null;
+  return profile[0];
+}
 
 // Round collection document:
 // gameID
