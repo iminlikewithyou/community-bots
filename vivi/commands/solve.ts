@@ -2,8 +2,41 @@ import { replyToInteraction, getInteractionContent } from '../../src/command-han
 import { getSolveLetters } from '../../src/emoji-renderer';
 import { CommandInteraction, SlashCommandBuilder, AttachmentBuilder } from 'discord.js';
 import { formatNumber, shuffle, SortingFunctions } from '../../src/utils';
-
 import { cleanWord, getPromptRegexFromPromptSearch, solvePromptWithTimeout } from '../../src/dictionary/dictionary';
+import { parseArguments } from '../../src/argument-parser';
+
+// export const data = new SlashCommandBuilder()
+//   .setName('solve')
+//   .setDescription('Solve a prompt!')
+//   .addStringOption(option =>
+//     option.setName('prompt')
+//       .setDescription('The prompt to solve')
+//       .setRequired(true))
+//   .addStringOption(option =>
+//     option.setName('dictionary')
+//       .setDescription('The dictionary to solve in')
+//       .setRequired(false)
+//       .addChoices({
+//         name: 'English',
+//         value: 'English'
+//       }))
+//   .addStringOption(option => 
+//     option.setName('sorting')
+//       .setDescription("How to sort solutions (forces text file output)")
+//       .setRequired(false)
+//       .addChoices({
+//         name: 'Length (Descending)',
+//         value: 'lengthDescending'
+//       }, {
+//         name: 'Length (Ascending)',
+//         value: 'lengthAscending'
+//       }, {
+//         name: 'Alphabetical',
+//         value: 'alphabetical'
+//       }, {
+//         name: 'Length (Descending), Alphabetical',
+//         value: 'lengthThenAlphabetical'
+//       }));
 
 export const data = new SlashCommandBuilder()
   .setName('solve')
@@ -11,40 +44,27 @@ export const data = new SlashCommandBuilder()
   .addStringOption(option =>
     option.setName('prompt')
       .setDescription('The prompt to solve')
-      .setRequired(true))
-  .addStringOption(option =>
-    option.setName('dictionary')
-      .setDescription('The dictionary to solve in')
-      .setRequired(false)
-      .addChoices({
-        name: 'English',
-        value: 'English'
-      }))
+      .setRequired(true)
+  )
   .addStringOption(option => 
-    option.setName('sorting')
-      .setDescription("How to sort solutions (forces text file output)")
+    option.setName('arguments')
+      .setDescription('Arguments for the solver')
       .setRequired(false)
-      .addChoices({
-        name: 'Length (Descending)',
-        value: 'lengthDescending'
-      }, {
-        name: 'Length (Ascending)',
-        value: 'lengthAscending'
-      }, {
-        name: 'Alphabetical',
-        value: 'alphabetical'
-      }, {
-        name: 'Length (Descending), Alphabetical',
-        value: 'lengthThenAlphabetical'
-      }));
+  );
 
 export const broadcastable = true;
 
 // create function to handle the command
 export async function execute(interaction: CommandInteraction, preferBroadcast: boolean) {
   let prompt = cleanWord(interaction.options.get("prompt", true).value);
-  // @ts-ignore
-  let sorting: string = interaction.options.get("sorting")?.value ?? "None";
+  let _arguments = interaction.options.get("arguments").value as string | undefined;
+  
+  let args = parseArguments(_arguments);
+  let { sort, file, regex } = args;
+  console.log(args, sort, file);
+  
+  // // @ts-ignore
+  // let sorting: string = interaction.options.get("sorting")?.value ?? "None";
 
   try {
     // cleanWord is called twice here on prompt
@@ -57,8 +77,8 @@ export async function execute(interaction: CommandInteraction, preferBroadcast: 
     + (solutions.length === 1 ? '**1** solution!' : '**' + formatNumber(solutions.length) + '** solutions!')
     + '\n';
 
-    if (sorting !== "None" && solveCount > 0) {
-      solutions.sort(SortingFunctions[sorting]);
+    if (sort !== undefined && solveCount > 0) {
+      solutions.sort(SortingFunctions[sort]);
 
       // let fHeader = solveCount === 1 ? "1 solution" : `${formatNumber(solveCount)} solutions` + ` for \`${prompt}\` ` + `sorted by ${sorting_formatted}!`;
       let fileData = Buffer.from(solutions.join("\n"), "utf-8");
