@@ -49,6 +49,10 @@ export function escapeDiscordMarkdown(string: string) {
   return string.replace(/[\\`_~\*\|:#@><-]/g, "\\$&");
 }
 
+export function clamp(v: number, minv: number, maxv: number): number {
+  return Math.max(minv, Math.min(maxv, v));
+}
+
 export const SortingFunctions = {
   lengthDescending: (a, b) => b.length - a.length,
   lengthAscending: (a, b) => a.length - b.length,

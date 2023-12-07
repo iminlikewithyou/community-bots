@@ -60,7 +60,7 @@ export async function execute(interaction: CommandInteraction, preferBroadcast: 
   let _arguments = interaction.options.get("arguments").value as string | undefined;
   
   let args = parseArguments(_arguments);
-  let { sort, file, regex } = args;
+  let { sort, file, regex, min, max } = args;
   console.log(args, sort, file);
   
   // // @ts-ignore
@@ -78,14 +78,19 @@ export async function execute(interaction: CommandInteraction, preferBroadcast: 
     + '\n';
 
     if (sort !== undefined && solveCount > 0) {
-      solutions.sort(SortingFunctions[sort]);
+      let minmaxSolutions = solutions.filter((v) => v.length >= Math.max(min || 0) && v.length <= Math.min(max || 99));
+      minmaxSolutions.sort(sort);
+
+      let OURsolverString = '\nI found '
+      + (solutions.length === 1 ? '**1** solution!' : '**' + formatNumber(minmaxSolutions.length) + '** solutions!')
+      + '\n';
 
       // let fHeader = solveCount === 1 ? "1 solution" : `${formatNumber(solveCount)} solutions` + ` for \`${prompt}\` ` + `sorted by ${sorting_formatted}!`;
-      let fileData = Buffer.from(solutions.join("\n"), "utf-8");
+      let fileData = Buffer.from(minmaxSolutions.join("\n"), "utf-8");
       let attachment = new AttachmentBuilder(fileData, { name: `vivi-result.txt` });
 
       return await interaction.reply({
-        content: getInteractionContent(interaction, "Solver", solverString, preferBroadcast),
+        content: getInteractionContent(interaction, "Solver", OURsolverString, preferBroadcast),
         files: [attachment],
         ephemeral: !preferBroadcast
       })
@@ -95,6 +100,7 @@ export async function execute(interaction: CommandInteraction, preferBroadcast: 
       await replyToInteraction(interaction, "Solver", "\n• That prompt is impossible.", preferBroadcast);
     } else {
       shuffle(solutions);
+      let minmaxSolutions = solutions.filter((v) => v.length > Math.max(min || 0) && v.length < Math.min(max || 99));
 
       let solutionStrings: string[] = [];
       let solutionsLength = 0;
