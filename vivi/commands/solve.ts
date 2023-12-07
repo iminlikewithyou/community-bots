@@ -3,7 +3,7 @@ import { getSolveLetters } from '../../src/emoji-renderer';
 import { CommandInteraction, SlashCommandBuilder, AttachmentBuilder } from 'discord.js';
 import { formatNumber, shuffle, SortingFunctions } from '../../src/utils';
 import { cleanWord, getPromptRegexFromPromptSearch, solvePromptWithTimeout } from '../../src/dictionary/dictionary';
-import { parseArguments } from '../../src/argument-parser';
+import { Argument, parseArguments } from '../../src/argument-parser';
 
 // export const data = new SlashCommandBuilder()
 //   .setName('solve')
@@ -52,6 +52,7 @@ export const data = new SlashCommandBuilder()
       .setRequired(false)
   );
 
+
 export const broadcastable = true;
 
 // create function to handle the command
@@ -61,36 +62,29 @@ export async function execute(interaction: CommandInteraction, preferBroadcast: 
   
   let args = parseArguments(_arguments);
   let { sort, file, regex, min, max } = args;
-  console.log(args, sort, file);
-  
-  // // @ts-ignore
-  // let sorting: string = interaction.options.get("sorting")?.value ?? "None";
+  console.log(args);
 
   try {
     // cleanWord is called twice here on prompt
     let regex = getPromptRegexFromPromptSearch(prompt);
 
     let solutions: string[] = await solvePromptWithTimeout(regex, 1300, interaction.user.id);
+    solutions = solutions.filter((v) => v.length >= (min || 0) && v.length <= (max || 99));
     let solveCount = solutions.length;
 
     let solverString = '\nI found '
     + (solutions.length === 1 ? '**1** solution!' : '**' + formatNumber(solutions.length) + '** solutions!')
     + '\n';
 
-    if (sort !== undefined && solveCount > 0) {
-      let minmaxSolutions = solutions.filter((v) => v.length >= Math.max(min || 0) && v.length <= Math.min(max || 99));
-      minmaxSolutions.sort(sort);
-
-      let OURsolverString = '\nI found '
-      + (solutions.length === 1 ? '**1** solution!' : '**' + formatNumber(minmaxSolutions.length) + '** solutions!')
-      + '\n';
+    if ((sort !== undefined && solveCount > 0) || file) {
+      solutions.sort(sort);
 
       // let fHeader = solveCount === 1 ? "1 solution" : `${formatNumber(solveCount)} solutions` + ` for \`${prompt}\` ` + `sorted by ${sorting_formatted}!`;
-      let fileData = Buffer.from(minmaxSolutions.join("\n"), "utf-8");
+      let fileData = Buffer.from(solutions.join("\n"), "utf-8");
       let attachment = new AttachmentBuilder(fileData, { name: `vivi-result.txt` });
 
       return await interaction.reply({
-        content: getInteractionContent(interaction, "Solver", OURsolverString, preferBroadcast),
+        content: getInteractionContent(interaction, "Solver", solverString, preferBroadcast),
         files: [attachment],
         ephemeral: !preferBroadcast
       })
@@ -100,7 +94,6 @@ export async function execute(interaction: CommandInteraction, preferBroadcast: 
       await replyToInteraction(interaction, "Solver", "\n• That prompt is impossible.", preferBroadcast);
     } else {
       shuffle(solutions);
-      let minmaxSolutions = solutions.filter((v) => v.length > Math.max(min || 0) && v.length < Math.min(max || 99));
 
       let solutionStrings: string[] = [];
       let solutionsLength = 0;
