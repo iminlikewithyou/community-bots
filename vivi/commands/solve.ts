@@ -69,7 +69,7 @@ export async function execute(interaction: CommandInteraction, preferBroadcast: 
     let regex = getPromptRegexFromPromptSearch(prompt);
 
     let solutions: string[] = await solvePromptWithTimeout(regex, 1300, interaction.user.id);
-    solutions = solutions.filter((v) => v.length >= (min || 0) && v.length <= (max || 99));
+    if (solutions.length !== 0 || (min !== undefined || max !== undefined)) { solutions = solutions.filter((v) => v.length >= min && v.length <= max); }
     let solveCount = solutions.length;
 
     let solverString = '\nI found '
