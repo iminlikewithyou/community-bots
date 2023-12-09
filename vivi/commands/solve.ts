@@ -58,7 +58,7 @@ export const broadcastable = true;
 // create function to handle the command
 export async function execute(interaction: CommandInteraction, preferBroadcast: boolean) {
   let prompt = cleanWord(interaction.options.get("prompt", true).value);
-  let _arguments = interaction.options.get("arguments").value as string | undefined;
+  let _arguments = interaction.options.get("arguments", false)?.value as string ?? "";
   
   let args = parseArguments(_arguments);
   let { sort, file, regex, min, max } = args;
