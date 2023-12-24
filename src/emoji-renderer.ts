@@ -4,6 +4,7 @@ import { escapeDiscordMarkdown } from "./utils";
 import remarkEmojiMap from "../assets/emoji-maps/remarkEmojis";
 import goldLettersMap from "../assets/emoji-maps/goldLetters";
 import whiteLettersMap from "../assets/emoji-maps/whiteLetters";
+import absentLettersMap from "../assets/emoji-maps/absentLetters";
 import streakNumbersMap from "../assets/emoji-maps/streakNumbers";
 
 const invalidPromptDisplayRegex = /[^A-Z0-9'\-@ ]/;
@@ -51,6 +52,10 @@ export function getStreakNumbers(number) {
 
 export function getNormalLetters(string) {
   return replaceTextWithLetterMap(string, whiteLettersMap);
+}
+
+export function getAbsentLetters(string) {
+  return replaceTextWithLetterMap(string, absentLettersMap);
 }
 
 export function getSolveLetters(solution, promptRegex) {
