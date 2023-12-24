@@ -1,7 +1,7 @@
 import { CommandInteraction, SlashCommandBuilder } from "discord.js";
 import { formatNumber } from "../../src/utils";
 import { getAbsentLetters, getNormalLetters, getPromptLetters } from "../../src/emoji-renderer";
-import { englishDictionary } from "../../src/dictionary/dictionary";
+import { englishDictionary, englishStartMap5L, englishStartMap6L, isWordFastUnsafe } from "../../src/dictionary/dictionary";
 
 export const data = new SlashCommandBuilder()
   .setName("generate")
@@ -11,11 +11,11 @@ export const data = new SlashCommandBuilder()
       .setName("amount")
       .setDescription("Amount of letters to generate")
       .setRequired(false)
-      .setMinValue(1)
+      .setMinValue(5)
       .setMaxValue(6)
   );
 
-export const cooldown = 0;
+export const cooldown = 15 * 1000;
 
 const tileScores = {
   "A": 1,
@@ -44,6 +44,14 @@ const tileScores = {
   "X": 8,
   "Y": 3,
   "Z": 10,
+}
+
+async function sendMessage(interaction: CommandInteraction, content: string) {
+  if (interaction.replied) {
+    await interaction.editReply(content);
+  } else {
+    await interaction.reply(content);
+  }
 }
 
 const rollingEmoji = [
@@ -79,161 +87,123 @@ class Bag {
     this.pulledLetters += letter;
     return letter;
   }
+
+  pullLetters(amount: number) {
+    for (let i = 0; i < amount; i++) this.pullLetter();
+  }
 }
 
 export async function execute(interaction: CommandInteraction, preferBroadcast: boolean) {
+  // await interaction.deferReply();
+  const startTime = Date.now();
+
   let bag = new Bag(defaultBag);
 
-  // await interaction.deferReply();
+  const letterCount = interaction.options.get("amount")?.value as number ?? 6;
+  const map = letterCount == 5 ? englishStartMap5L : englishStartMap6L;
+  bag.pullLetters(letterCount);
 
-  const letterCount = interaction.options.get("amount")?.value as number ?? 5;
+  // let payout = 0;
 
-  // const bet = 20;
-  let payout = 0;
+  // go through the word start map and find the most favorable word starts for the letters
 
-  async function updateRollMessage() {
-    let content = "Rolling..\n\n";
+  const getWordStartCount = (word: string) => {
+    const regexp = new RegExp("^(\\d*)\\t" + word + "$", "m");
+    
+    // get the number from the capturing group
+    const match = regexp.exec(map);
+    
+    // if there is no match, there are no words which start with this word
+    if (!match) return 0;
 
-    let pulledLetters = bag.pulledLetters;
+    // return the number of words which start with this word
+    const number = parseInt(match[1]);
+    return number;
+  };
 
-    content += getNormalLetters(pulledLetters);
-    content += getRollingEmoji(pulledLetters.length, letterCount - pulledLetters.length);
+  // Make every possible combination of starts which appear in the dictionary from the random letters
+  const startMap = new Map<string, number>();
+  const makeWordStartMap = (letters: string, word: string) => {
+    if (word !== "") { // this is an annoying check to perform a million times
+      // Stop generating more combinations if this start doesn't exist in the dictionary
+      const count = getWordStartCount(word);
+      if (count == 0) return;
 
-    if (interaction.replied) {
-      await interaction.editReply(content);
-    } else {
-      await interaction.reply(content);
+      startMap.set(word, count);
+    }
+    
+    for (let i = 0; i < letters.length; i++) {
+      makeWordStartMap(letters.slice(0, i) + letters.slice(i + 1), word + letters[i]);
+    }
+  };
+  makeWordStartMap(bag.pulledLetters, "");
+
+  const sortedStartMap = new Map([...startMap.entries()].sort((a, b) => b[1] - a[1]));
+  const validWords = [];
+  const possibilities = new Map<number, number>();
+  let longestWordStartLength = 0;
+  let longestWordStart = "";
+  let highestPossibility = 0;
+  for (const [wordStart, count] of sortedStartMap) {
+    // compile the valid words
+    if (isWordFastUnsafe(wordStart)) {
+      validWords.push(wordStart);
+    }
+
+    // add the number of possibilities from this word start at this length
+    const length = wordStart.length;
+    possibilities.set(length, (possibilities.get(length) ?? 0) + count);
+
+    // update the best word start
+    if (length > longestWordStartLength || count > highestPossibility) {
+      highestPossibility = count;
+      longestWordStartLength = length;
+      longestWordStart = wordStart;
     }
   }
 
-  await updateRollMessage();
+  // set the "best" combination to be the longest word start
+  const best = longestWordStart;
+
+  // remove the best word's letters from the bag
+  for (let i = 0; i < best.length; i++) {
+    bag.pulledLetters = bag.pulledLetters.replace(best[i], "");
+  }
+  // now put the best word at the start of the bag
+  bag.pulledLetters = best + bag.pulledLetters;
+
+  const endTime = Date.now();
+  const timeTaken = formatNumber(endTime - startTime);
 
   // Generate random letters
   let letters = "";
-  for (let i = 0; i < letterCount; i++) {
-    letters += bag.pullLetter();
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    await updateRollMessage();
-  }
-
-  await new Promise(resolve => setTimeout(resolve, 1500));
-
-  // TODO
-  // await updateMessage();
-
-  const doesWordStartCombinationExist = (word: string) => {
-    return new RegExp("^" + word + ".*$", "m").test(englishDictionary);
-  };
-
-  // Make every possible combination of words from the random letters
-  const words = new Set<string>();
-  const makeWords = (letters: string, word: string) => {
-    // Stop generating more combinations if this start doesn't exist in the dictionary
-    if (!doesWordStartCombinationExist(word)) return;
-
-    words.add(word);
+  for (let i = -1; i < bag.pulledLetters.length; i++) {
+    letters = bag.pulledLetters.slice(0, i + 1);
     
-    for (let i = 0; i < letters.length; i++) {
-      makeWords(letters.slice(0, i) + letters.slice(i + 1), word + letters[i]);
+    const possibilityCount = possibilities.get(letters.length) ?? 0;
+
+    let content = "Rolling (generated in " + timeTaken + "ms)..\n\n";
+
+    if (letters.length == letterCount) {
+      if (possibilityCount > 0) {
+        content += "JACKPOT!\n";
+        content += getPromptLetters(letters);
+      } else {
+        content += "Better luck next time..\n";
+        content += getNormalLetters(letters);
+      }
+    } else {
+      if (i == -1) {
+        content += "Possibilities: ...\n";
+      } else {
+        content += "Possibilities: " + formatNumber(possibilityCount) + "\n";
+      }
+
+      content += getNormalLetters(letters);
+      content += getRollingEmoji(letters.length, letterCount - letters.length);
     }
-  };
-  makeWords(letters, "");
-  words.delete(""); // Bandaid
 
-  const startTime = Date.now();
-
-  const dictionaryWordCount = words.size;
-
-  const isWord = (word: string) => {
-    return new RegExp("^" + word + "$", "m").test(englishDictionary);
-  };
-
-  // Check if any of the words are in the dictionary
-  const validWords = [];
-  words.forEach(word => {
-    if (isWord(word)) {
-      validWords.push(word);
-    }
-  });
-
-  const endTime = Date.now();
-  const timeTaken = endTime - startTime;
-
-  // Sort words by length, then tile score
-  // validWords.sort((a, b) => {
-  //   if (b.length !== a.length) return b.length - a.length;
-
-  //   let scoreA = 0;
-  //   let scoreB = 0;
-  //   for (let i = 0; i < a.length; i++) {
-  //     scoreA += tileScores[a[i]];
-  //   }
-  //   for (let i = 0; i < b.length; i++) {
-  //     scoreB += tileScores[b[i]];
-  //   }
-  //   return scoreB - scoreA;
-  // });
-
-  // sort by length
-  validWords.sort((a, b) => b.length - a.length);
-
-  // Sort words by tile score
-  // validWords.sort((a, b) => {
-  //   let scoreA = 0;
-  //   let scoreB = 0;
-  //   for (let i = 0; i < a.length; i++) {
-  //     scoreA += tileScores[a[i]];
-  //   }
-  //   for (let i = 0; i < b.length; i++) {
-  //     scoreB += tileScores[b[i]];
-  //   }
-  //   return scoreB - scoreA;
-  // });
-
-  const validWordCount = validWords.length;
-  // const validWordCountString = formatNumber(validWordCount);
-
-  // let highestScore = 0;
-
-  // const wordsToShow = 10;
-  // // Make a list of the top words
-  // let topWords = validWords.slice(0, wordsToShow).map((word: string) => {
-  //   if (word.length < letterCount - 1) return;
-    
-  //   let score = word.split("").reduce((acc, letter) => acc + tileScores[letter], 0);
-  //   const multiplier = word.length === letterCount ? 3 : 1;
-  //   let finalScore = Math.ceil(score * multiplier);
-  //   if (finalScore > highestScore) highestScore = finalScore;
-
-  //   return `${getPromptLetters(word)} ${score} points` + (multiplier > 1 ? ` x${multiplier} -> ${finalScore}` : "");
-  // }).join("\n");
-
-  // // Check if any of the words are in the dictionary
-  // const validWords = words.filter(word => isWord(word));
-
-  // let payout = Math.ceil(highestScore * (1 / 15) * bet);
-
-  // await interaction.reply({
-  //   content: 
-  //     `${formatNumber(timeTaken)} ms\nBET: ${bet}\nPAYOUT: ${payout}\nPROFIT: ${payout - bet}\n\nROLL:\n${getNormalLetters(letters)}\n\n${validWordCountString} words, TOP RESULTS:\n${topWords}`
-  // });
-
-  // get the first word in the list
-  const bestWord = validWords[0];
-
-  // remove the best word from the bag
-  for (let i = 0; i < bestWord.length; i++) {
-    bag.pulledLetters = bag.pulledLetters.replace(bestWord[i], "");
+    await sendMessage(interaction, content);
+    await new Promise(resolve => setTimeout(resolve, 2000));
   }
-
-  let content = "Rolling..\n\n";
-
-  if (bestWord.length == letterCount) {
-    content += getPromptLetters(bestWord);
-  } else {
-    content += getNormalLetters(bestWord);
-    content += getAbsentLetters(bag.pulledLetters);
-  }
-
-  await interaction.editReply(content);
 }
