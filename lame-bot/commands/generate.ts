@@ -1,7 +1,9 @@
 import { CommandInteraction, SlashCommandBuilder } from "discord.js";
 import { formatNumber } from "../../src/utils";
 import { getAbsentLetters, getNormalLetters, getPromptLetters } from "../../src/emoji-renderer";
-import { englishDictionary, englishStartMap5L, englishStartMap6L, isWordFastUnsafe } from "../../src/dictionary/dictionary";
+import { englishDictionary, englishStartMapStrings, isWordFastUnsafe } from "../../src/dictionary/dictionary";
+import { addCash, getCash, spendCash } from "../../src/database/db";
+import { replyToInteraction } from "../../src/command-handler";
 
 export const data = new SlashCommandBuilder()
   .setName("generate")
@@ -11,8 +13,8 @@ export const data = new SlashCommandBuilder()
       .setName("amount")
       .setDescription("Amount of letters to generate")
       .setRequired(false)
-      .setMinValue(5)
-      .setMaxValue(6)
+      .setMinValue(3)
+      .setMaxValue(7)
   );
 
 export const cooldown = 15 * 1000;
@@ -99,11 +101,31 @@ export async function execute(interaction: CommandInteraction, preferBroadcast: 
 
   let bag = new Bag(defaultBag);
 
-  const letterCount = interaction.options.get("amount")?.value as number ?? 6;
-  const map = letterCount == 5 ? englishStartMap5L : englishStartMap6L;
+  const letterCount = interaction.options.get("amount")?.value as number ?? 5;
+  const map = englishStartMapStrings[letterCount];
   bag.pullLetters(letterCount);
 
-  // let payout = 0;
+  let pay = 25;
+  let minPayout = 23;
+  let maxPayout = 164;
+
+  // minPayout at 3 letters and maxPayout at 7 letters
+  let payout = Math.floor((maxPayout - minPayout) / 4 * (letterCount - 3) + minPayout + Math.random() * 19);
+
+  let userCash = await getCash(interaction.user.id);
+  if (userCash < pay) {
+    await replyToInteraction(
+      interaction,
+      "Generate",
+      "\n• You need " + pay + " cash for that. You have " + formatNumber(userCash) + " cash.",
+      false
+    );
+    return;
+  }
+  await spendCash(interaction.user.id, pay);
+  
+  // about 0.2131147541 chance of payout
+
 
   // go through the word start map and find the most favorable word starts for the letters
 
@@ -177,20 +199,24 @@ export async function execute(interaction: CommandInteraction, preferBroadcast: 
 
   // Generate random letters
   let letters = "";
+  let emptyAt = 9999;
   for (let i = -1; i < bag.pulledLetters.length; i++) {
     letters = bag.pulledLetters.slice(0, i + 1);
     
     const possibilityCount = possibilities.get(letters.length) ?? 0;
 
-    let content = "Rolling (generated in " + timeTaken + "ms)..\n\n";
+    let content = "Rolling (generated in " + timeTaken + "ms).. Cost: " + pay + " cash\n\n";
 
+    if (possibilityCount == 0 && i >= 0 && emptyAt == 9999) emptyAt = i;
     if (letters.length == letterCount) {
       if (possibilityCount > 0) {
-        content += "JACKPOT!\n";
+        content += "JACKPOT! Payout: " + payout + " cash.\n";
         content += getPromptLetters(letters);
+
+        addCash(interaction.user.id, payout);
       } else {
         content += "Better luck next time..\n";
-        content += getNormalLetters(letters);
+        content += getNormalLetters(letters.substring(0, emptyAt)) + getAbsentLetters(letters.substring(emptyAt));
       }
     } else {
       if (i == -1) {
@@ -199,7 +225,7 @@ export async function execute(interaction: CommandInteraction, preferBroadcast: 
         content += "Possibilities: " + formatNumber(possibilityCount) + "\n";
       }
 
-      content += getNormalLetters(letters);
+      content += getNormalLetters(letters.substring(0, emptyAt)) + getAbsentLetters(letters.substring(emptyAt));
       content += getRollingEmoji(letters.length, letterCount - letters.length);
     }
 
