@@ -11,11 +11,17 @@ try {
   var related1000String = fs.readFileSync(appRoot.resolve("assets/word-lists/lists/1000-related.txt"), "utf8");
   var related10000String = fs.readFileSync(appRoot.resolve("assets/word-lists/lists/10000-related.txt"), "utf8");
   var relatedDoomString = fs.readFileSync(appRoot.resolve("assets/word-lists/lists/doom-related.txt"), "utf8");
+  var englishStartMapString = fs.readFileSync(appRoot.resolve("assets/word-lists/maps/english-start-map.txt"), "utf8");
+  var englishStartMap5LString = fs.readFileSync(appRoot.resolve("assets/word-lists/maps/english-5L-start-map.txt"), "utf8");
+  var englishStartMap6LString = fs.readFileSync(appRoot.resolve("assets/word-lists/maps/english-6L-start-map.txt"), "utf8");
 } catch (e) {
   throw "Couldn't retrieve word lists from files.";
 }
 
 export const englishDictionary = dictionaryString;
+export const englishStartMap = englishStartMapString;
+export const englishStartMap5L = englishStartMap5LString;
+export const englishStartMap6L = englishStartMap6LString;
 
 // TODO holy copy-paste batman
 
@@ -126,6 +132,10 @@ export function escapeRegExp(string) {
 export function isWord(word) {
   let cleanInput = standardizeWord(escapeRegExp(word));
   return new RegExp("^" + cleanInput + "$", "m").test(dictionaryString);
+}
+
+export function isWordFastUnsafe(word) {
+  return new RegExp("^" + word + "$", "m").test(dictionaryString);
 }
 
 export function solvePrompt(promptRegex) {
