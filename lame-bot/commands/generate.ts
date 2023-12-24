@@ -8,16 +8,13 @@ import { replyToInteraction } from "../../src/command-handler";
 export const data = new SlashCommandBuilder()
   .setName("generate")
   .setDescription("Test command - generate letters")
-  .addIntegerOption(option =>
+  .addStringOption((option) =>
     option
-      .setName("amount")
-      .setDescription("Amount of letters to generate")
-      .setRequired(false)
-      .setMinValue(3)
-      .setMaxValue(7)
+      .setName("letters")
+      .setDescription("The number of letters to generate (3-7)")
   );
 
-export const cooldown = 15 * 1000;
+export const cooldown = 6 * 1000;
 
 const tileScores = {
   "A": 1,
@@ -95,141 +92,253 @@ class Bag {
   }
 }
 
+const baseCostPerSlot = 20;
+const increasePerExtraSlot = 10;
+
+const curveMin = 23; // 25
+const curveMax = 150; // 180
+const midpoint = 5;
+const steepness = 1.6;
+
+function getPayoutAt(letterCount: number) {
+  return Math.floor(curveMin + (curveMax - curveMin) / (1 + Math.exp(-steepness * (letterCount - midpoint))));
+}
+
+function getRandomPayout() {
+  return Math.floor(Math.random() * 19);
+}
+
+class Slot {
+  // set variables
+  letterCount: number;
+  
+  // generated
+  pulledLetters: string;
+  possibilities: Map<number, number>;
+  failsAt: number;
+  payout: number;
+
+  constructor(letterCount: number) {
+    let bag = new Bag(defaultBag);
+    bag.pullLetters(letterCount);
+
+    this.pulledLetters = bag.pulledLetters;
+    this.letterCount = letterCount;
+  }
+
+  run() {
+    // go through the word start map and find the most favorable word starts for the letters
+    let map = englishStartMapStrings[this.letterCount];
+    const getWordStartCount = (word: string) => {
+      const regexp = new RegExp("^(\\d*)\\t" + word + "$", "m");
+      
+      // get the number from the capturing group
+      const match = regexp.exec(map);
+      
+      // if there is no match, there are no words which start with this word
+      if (!match) return 0;
+  
+      // return the number of words which start with this word
+      const number = parseInt(match[1]);
+      return number;
+    }
+
+    // Make every possible combination of starts which appear in the dictionary from the random letters
+    const startMap = new Map<string, number>();
+    const makeWordStartMap = (letters: string, word: string) => {
+      if (word !== "") { // this is an annoying check to perform a million times
+        // Stop generating more combinations if this start doesn't exist in the dictionary
+        const count = getWordStartCount(word);
+        if (count == 0) return;
+
+        startMap.set(word, count);
+      }
+      
+      for (let i = 0; i < letters.length; i++) {
+        makeWordStartMap(letters.slice(0, i) + letters.slice(i + 1), word + letters[i]);
+      }
+    };
+    makeWordStartMap(this.pulledLetters, "");
+
+    const sortedStartMap = new Map([...startMap.entries()].sort((a, b) => b[1] - a[1]));
+    // const validWords = [];
+    this.possibilities = new Map<number, number>();
+    let longestWordStartLength = 0;
+    let longestWordStart = "";
+    let highestPossibility = 0;
+    for (const [wordStart, count] of sortedStartMap) {
+      // compile the valid words
+      // if (isWordFastUnsafe(wordStart)) {
+      //   validWords.push(wordStart);
+      // }
+
+      // add the number of possibilities from this word start at this length
+      const length = wordStart.length;
+      this.possibilities.set(length, (this.possibilities.get(length) ?? 0) + count);
+
+      // update the best word start
+      if (length > longestWordStartLength || count > highestPossibility) {
+        highestPossibility = count;
+        longestWordStartLength = length;
+        longestWordStart = wordStart;
+      }
+    }
+
+    // set the "best" combination to be the longest word start
+    const best = longestWordStart;
+
+    // remove the best word's letters from the bag
+    for (let i = 0; i < best.length; i++) {
+      this.pulledLetters = this.pulledLetters.replace(best[i], "");
+    }
+    // now put the best word at the start of the bag
+    this.pulledLetters = best + this.pulledLetters;
+
+    // calculate if this word fails or not
+    this.failsAt = best.length === this.letterCount ? undefined : best.length;
+
+    if (this.failsAt) {
+      this.payout = 0;
+    } else {
+      let payout = getPayoutAt(this.letterCount) + getRandomPayout();
+
+      this.payout = payout;
+    }
+  }
+}
+
 export async function execute(interaction: CommandInteraction, preferBroadcast: boolean) {
   // await interaction.deferReply();
   const startTime = Date.now();
 
-  let bag = new Bag(defaultBag);
+  // const slot1 = interaction.options.get("slot1")?.value as number;
+  // const slot2 = interaction.options.get("slot2")?.value as number;
+  // const slot3 = interaction.options.get("slot3")?.value as number;
+  // const slot4 = interaction.options.get("slot4")?.value as number;
 
-  const letterCount = interaction.options.get("amount")?.value as number ?? 5;
-  const map = englishStartMapStrings[letterCount];
-  bag.pullLetters(letterCount);
+  const slotString = interaction.options.get("letters")?.value as string;
+  
+  // separate the string into numbers
+  let usedSlots: number[];
+  if (slotString) {
+    try {
+      usedSlots = slotString.replace(/\s,\//g, "").split("").map((value) => parseInt(value));
+    } catch (error) {
+      await replyToInteraction(
+        interaction,
+        "Generate",
+        "\n• Invalid slot numbers.",
+        false
+      );
+      return;
+    }
+  } else {
+    usedSlots = [5];
+  }
 
-  let pay = 25;
-  let minPayout = 23;
-  let maxPayout = 164;
-
-  // minPayout at 3 letters and maxPayout at 7 letters
-  let payout = Math.floor((maxPayout - minPayout) / 4 * (letterCount - 3) + minPayout + Math.random() * 19);
-
-  let userCash = await getCash(interaction.user.id);
-  if (userCash < pay) {
+  if (usedSlots.some((value) => value < 3 || value > 7)) {
     await replyToInteraction(
       interaction,
       "Generate",
-      "\n• You need " + pay + " cash for that. You have " + formatNumber(userCash) + " cash.",
+      "\n• Your slots must be between 3 and 7 letters long.",
       false
     );
     return;
   }
-  await spendCash(interaction.user.id, pay);
+
+  if (usedSlots.length > 4) {
+    await replyToInteraction(
+      interaction,
+      "Generate",
+      "\n• You can only generate up to 4 slots.",
+      false
+    );
+    return;
+  }
   
-  // about 0.2131147541 chance of payout
+  const adjustedCostPerSlot = increasePerExtraSlot * (usedSlots.length - 1) + baseCostPerSlot;
+  const multiplier = adjustedCostPerSlot / baseCostPerSlot;
+  const roundedCostPerSlot = Math.floor(adjustedCostPerSlot);
+  const totalPay = roundedCostPerSlot * usedSlots.length;
+  let roundedMultiplier = Math.round(multiplier * 10) / 10;
 
-
-  // go through the word start map and find the most favorable word starts for the letters
-
-  const getWordStartCount = (word: string) => {
-    const regexp = new RegExp("^(\\d*)\\t" + word + "$", "m");
-    
-    // get the number from the capturing group
-    const match = regexp.exec(map);
-    
-    // if there is no match, there are no words which start with this word
-    if (!match) return 0;
-
-    // return the number of words which start with this word
-    const number = parseInt(match[1]);
-    return number;
-  };
-
-  // Make every possible combination of starts which appear in the dictionary from the random letters
-  const startMap = new Map<string, number>();
-  const makeWordStartMap = (letters: string, word: string) => {
-    if (word !== "") { // this is an annoying check to perform a million times
-      // Stop generating more combinations if this start doesn't exist in the dictionary
-      const count = getWordStartCount(word);
-      if (count == 0) return;
-
-      startMap.set(word, count);
-    }
-    
-    for (let i = 0; i < letters.length; i++) {
-      makeWordStartMap(letters.slice(0, i) + letters.slice(i + 1), word + letters[i]);
-    }
-  };
-  makeWordStartMap(bag.pulledLetters, "");
-
-  const sortedStartMap = new Map([...startMap.entries()].sort((a, b) => b[1] - a[1]));
-  const validWords = [];
-  const possibilities = new Map<number, number>();
-  let longestWordStartLength = 0;
-  let longestWordStart = "";
-  let highestPossibility = 0;
-  for (const [wordStart, count] of sortedStartMap) {
-    // compile the valid words
-    if (isWordFastUnsafe(wordStart)) {
-      validWords.push(wordStart);
-    }
-
-    // add the number of possibilities from this word start at this length
-    const length = wordStart.length;
-    possibilities.set(length, (possibilities.get(length) ?? 0) + count);
-
-    // update the best word start
-    if (length > longestWordStartLength || count > highestPossibility) {
-      highestPossibility = count;
-      longestWordStartLength = length;
-      longestWordStart = wordStart;
-    }
+  let userCash = await getCash(interaction.user.id);
+  if (userCash < totalPay) {
+    await replyToInteraction(
+      interaction,
+      "Generate",
+      "\n- You need " + totalPay + " cash for that. You have " + formatNumber(userCash) + " cash.\n - " + roundedCostPerSlot + " per slot at " + roundedMultiplier + "x payout",
+      false
+    );
+    return;
   }
+  await spendCash(interaction.user.id, totalPay);
 
-  // set the "best" combination to be the longest word start
-  const best = longestWordStart;
+  const slots = usedSlots.map((value) => new Slot(value));
+  const highestLetterCount = Math.max(...slots.map((slot) => slot.letterCount));
 
-  // remove the best word's letters from the bag
-  for (let i = 0; i < best.length; i++) {
-    bag.pulledLetters = bag.pulledLetters.replace(best[i], "");
-  }
-  // now put the best word at the start of the bag
-  bag.pulledLetters = best + bag.pulledLetters;
+  // space this out so that it doesn't hang the bot later
+  slots.forEach((slot) => slot.run());
+  slots.forEach((slot) => {
+    slot.payout = Math.ceil(slot.payout * multiplier);
+  });
+
+  // calculate the total payout
+  let totalPayout = 0;
+  slots.forEach((slot) => {
+    totalPayout += slot.payout;
+  });
 
   const endTime = Date.now();
   const timeTaken = formatNumber(endTime - startTime);
 
-  // Generate random letters
-  let letters = "";
-  let emptyAt = 9999;
-  for (let i = -1; i < bag.pulledLetters.length; i++) {
-    letters = bag.pulledLetters.slice(0, i + 1);
-    
-    const possibilityCount = possibilities.get(letters.length) ?? 0;
+  for (let i = -1; i < highestLetterCount; i++) {
+    let content = "Rolling for " + totalPay + " cash • **" + roundedMultiplier + "x**..";
 
-    let content = "Rolling (generated in " + timeTaken + "ms).. Cost: " + pay + " cash\n\n";
+    if (i == highestLetterCount - 1) {
+      let net = totalPayout - totalPay;
+      content += " **" + (net > 0 ? "+" : "") + net + " cash**";
+    }
 
-    if (possibilityCount == 0 && i >= 0 && emptyAt == 9999) emptyAt = i;
-    if (letters.length == letterCount) {
-      if (possibilityCount > 0) {
-        content += "JACKPOT! Payout: " + payout + " cash.\n";
+    content += "\n\n";
+
+    for (let j = 0; j < slots.length; j++) {
+      const slot = slots[j];
+
+      const letters = slot.pulledLetters.slice(0, i + 1);
+      const possibilityCount = slot.possibilities.get(letters.length) ?? 0;
+
+      let slotDead = slot.failsAt && i >= slot.failsAt;
+      let slotComplete = letters.length == slot.letterCount;
+
+      if (slotComplete && !slotDead) {
         content += getPromptLetters(letters);
+      } else {
+        if (slot.failsAt) {
+          content += getNormalLetters(letters.substring(0, slot.failsAt)) + getAbsentLetters(letters.substring(slot.failsAt));
+        } else {
+          content += getNormalLetters(letters);
+        }
 
-        addCash(interaction.user.id, payout);
-      } else {
-        content += "Better luck next time..\n";
-        content += getNormalLetters(letters.substring(0, emptyAt)) + getAbsentLetters(letters.substring(emptyAt));
-      }
-    } else {
-      if (i == -1) {
-        content += "Possibilities: ...\n";
-      } else {
-        content += "Possibilities: " + formatNumber(possibilityCount) + "\n";
+        // add rolling emojis for the remaining letters
+        content += getRollingEmoji(letters.length, slot.letterCount - letters.length);
       }
 
-      content += getNormalLetters(letters.substring(0, emptyAt)) + getAbsentLetters(letters.substring(emptyAt));
-      content += getRollingEmoji(letters.length, letterCount - letters.length);
+      if (slotComplete) {
+        content += " • $" + (slot.payout > 0 ? slot.payout + " • **JACKPOT!!**" : "0");
+      } else {
+        content += " • " + formatNumber(possibilityCount) + " possibilit" + (possibilityCount == 1 ? "y" : "ies");
+      }
+      
+      content += "\n";
     }
 
     await sendMessage(interaction, content);
     await new Promise(resolve => setTimeout(resolve, 2000));
   }
+
+  // add the cash
+  await addCash(interaction.user.id, totalPayout);
+  
+  // about 0.2131147541 chance of payout
 }
