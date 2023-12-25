@@ -46,7 +46,7 @@ const tileScores = {
 }
 
 async function sendMessage(interaction: CommandInteraction, content: string) {
-  if (interaction.replied) {
+  if (interaction.replied || interaction.deferred) {
     await interaction.editReply(content);
   } else {
     await interaction.reply(content);
@@ -208,7 +208,6 @@ class Slot {
 }
 
 export async function execute(interaction: CommandInteraction, preferBroadcast: boolean) {
-  // await interaction.deferReply();
   const startTime = Date.now();
 
   // const slot1 = interaction.options.get("slot1")?.value as number;
@@ -273,6 +272,8 @@ export async function execute(interaction: CommandInteraction, preferBroadcast: 
     return;
   }
   await spendCash(interaction.user.id, totalPay);
+
+  await interaction.deferReply();
 
   const slots = usedSlots.map((value) => new Slot(value));
   const highestLetterCount = Math.max(...slots.map((slot) => slot.letterCount));
