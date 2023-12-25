@@ -95,17 +95,17 @@ class Bag {
 const baseCostPerSlot = 20;
 const increasePerExtraSlot = 10;
 
-const curveMin = 23; // 25
-const curveMax = 150; // 180
-const midpoint = 5;
-const steepness = 1.6;
+const curveMin = 26; // 25
+const curveMax = 146; // 180
+const midpoint = 5.3;
+const steepness = 1.9;
 
 function getPayoutAt(letterCount: number) {
   return Math.floor(curveMin + (curveMax - curveMin) / (1 + Math.exp(-steepness * (letterCount - midpoint))));
 }
 
 function getRandomPayout() {
-  return Math.floor(Math.random() * 19);
+  return Math.floor(Math.random() * 12);
 }
 
 class Slot {
