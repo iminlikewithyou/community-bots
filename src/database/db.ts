@@ -87,6 +87,7 @@ export async function getCash(user): Promise<Cash> {
     appearsBeforeAmount: false,
     displayAmount: "",
     displayFor: (amount: number) => {
+      if (amount < 0) return "-" + cash.displayFor(-amount);
       return (cash.appearsBeforeAmount ? cash.name : "") + formatNumber(amount) + (cash.appearsBeforeAmount ? "" : cash.name);
     }
   };
