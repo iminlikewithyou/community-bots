@@ -28,6 +28,8 @@ export const data = new SlashCommandBuilder()
           .setName("text")
           .setDescription("The text to add - two words max")
           .setRequired(true)
+          .setMinLength(3)
+          .setMaxLength(18)
       )
   )
 
