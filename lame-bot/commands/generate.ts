@@ -262,11 +262,11 @@ export async function execute(interaction: CommandInteraction, preferBroadcast: 
   let roundedMultiplier = Math.round(multiplier * 10) / 10;
 
   let userCash = await getCash(interaction.user.id);
-  if (userCash < totalPay) {
+  if (userCash.amount < totalPay) {
     await replyToInteraction(
       interaction,
       "Generate",
-      "\n- You need " + totalPay + " cash for that. You have " + formatNumber(userCash) + " cash.\n - " + roundedCostPerSlot + " per slot at " + roundedMultiplier + "x payout",
+      "\n- You need " + userCash.displayFor(totalPay) + " for that. You have " + userCash.displayAmount + ".\n - " + roundedCostPerSlot + " per slot at " + roundedMultiplier + "x payout",
       false
     );
     return;
