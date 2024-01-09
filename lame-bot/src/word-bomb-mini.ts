@@ -150,7 +150,7 @@ async function startRound() {
 })();
 
 function getCleanName(name) {
-  let cleanName = escapeDiscordMarkdown(name.replace(/﷽/g, ""));
+  let cleanName = escapeDiscordMarkdown(name.replace(/﷽𒐫𒈙⸻꧅ဪ/g, ""));
   if (cleanName === "") {
     if (name.length === 0) {
       return "Lame Member";
@@ -482,11 +482,10 @@ async function endRound() {
 
     if (solutionCount === 1) {
       uniqueSolutions++;
-      // Uncomment this when there are enough unique solutions
-      // addRemark({
-      //   index: REMARK.uniqueSolve,
-      //   remark: getRemarkEmoji("uniqueSolve") + " That's the **first time** this solve has ever been used!"
-      // });
+      addRemark({
+        index: REMARK.uniqueSolve,
+        remark: getRemarkEmoji("uniqueSolve") + " That's the **first time** this solve has ever been used!"
+      });
     }
 
     // Keep track of unique solutions in the console
@@ -655,6 +654,9 @@ lameBotClient.on("messageCreate", (message) => {
 
   // stop if this user has already solved
   if (solves.some((s) => s.user === message.author.id)) return;
+
+  // stop if the message content has new lines
+  if (message.content.includes("\n")) return;
 
   // check if the guess is a solve and if it contains the prompt
   let guess = cleanWord(message.content);

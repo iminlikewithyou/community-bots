@@ -1,6 +1,7 @@
-import { Client, Collection, CommandInteraction, Events, GuildMember, GuildTextBasedChannel, Routes } from "discord.js";
+import { ChannelType, Client, Collection, CommandInteraction, Events, GuildMember, GuildTextBasedChannel, Message, Routes } from "discord.js";
 import { REST } from "@discordjs/rest";
 import fs from "node:fs";
+import { escapeDiscordMarkdown } from "./utils";
 
 const COOLDOWN_TIME = 2000;
 const commandCooldown = new Map();
@@ -14,12 +15,21 @@ type CommandLimit = {
   includeBotsChannel: boolean;
 }
 
-type BotCommand = {
-  data: any;
+type BaseCommand = {
   cooldown: number;
   limits?: CommandLimit[];
   tags?: string[];
+}
+
+type BotCommand = BaseCommand & {
+  data: any;
   execute: (interaction: any, preferBroadcast: boolean) => Promise<void>;
+}
+
+type MentionCommand = BaseCommand & {
+  NAME_DUMB: string; // temporarily required
+  matches: (text: string) => boolean;
+  execute: (message: Message, text: string) => Promise<void>;
 }
 
 function commandToBroadcastOption(command: BotCommand) {
@@ -49,7 +59,7 @@ function getMemberLevel(member: GuildMember) {
   return 0;
 }
 
-function getCommandLimitsFor(member: GuildMember, command: BotCommand): CommandLimit {
+function getCommandLimitsFor(member: GuildMember, command: BaseCommand): CommandLimit {
   if (!command.limits) return undefined;
   const memberLevel = getMemberLevel(member);
   let limit: CommandLimit;
@@ -66,7 +76,7 @@ function areLimitsIgnored(limit: CommandLimit, channel: GuildTextBasedChannel) {
   return channel.name.toLowerCase().includes("roll") || isBroadcastChannel(channel);
 }
 
-function isCommandLimited(member: GuildMember, command: BotCommand, commandName: string, channel: GuildTextBasedChannel) {
+function isCommandLimited(member: GuildMember, command: BaseCommand, commandName: string, channel: GuildTextBasedChannel) {
   let limits = getCommandLimitsFor(member, command);
   if (!limits) return false;
 
@@ -88,7 +98,7 @@ function getLimitTime(member: GuildMember, commandName: string) {
   return Math.max(limitEnd - Date.now(), 0);
 }
 
-function addLimits(member: GuildMember, command: BotCommand, commandName: string, channel: GuildTextBasedChannel) {
+function addLimits(member: GuildMember, command: BaseCommand, commandName: string, channel: GuildTextBasedChannel) {
   let limits = getCommandLimitsFor(member, command);
   if (!limits) return;
 
@@ -128,8 +138,14 @@ function secondsToEnglish(seconds: number) {
 
 export function registerClientAsCommandHandler(client: Client, commandFolder: string, clientID: string, token: string) {
   const commands: Collection<string, BotCommand> = new Collection();
+  const mentionCommands: Collection<string, MentionCommand> = new Collection();
+
   const commandFiles = fs
     .readdirSync(commandFolder)
+    .filter((file) => file.endsWith(".js") || file.endsWith(".ts"));
+
+  const mentionCommandFiles = fs
+    .readdirSync(commandFolder + "/mentions")
     .filter((file) => file.endsWith(".js") || file.endsWith(".ts"));
 
   const JSONcommands = [];
@@ -154,6 +170,14 @@ export function registerClientAsCommandHandler(client: Client, commandFolder: st
     }
   }
 
+  for (const file of mentionCommandFiles) {
+    const command = require(`${commandFolder}/mentions/${file}`);
+    // check if matches and execute are defined in command
+    if (command.matches && command.execute) {
+      mentionCommands.set(command.NAME_DUMB, command);
+    }
+  }
+
   if (broadcastCommand.options.length > 0) JSONcommands.push(broadcastCommand);
 
   const rest = new REST({ version: "10" }).setToken(token);
@@ -167,6 +191,43 @@ export function registerClientAsCommandHandler(client: Client, commandFolder: st
       console.error(error);
     }
   })();
+
+  client.on(Events.MessageCreate, async (message) => {
+    if (!message.member) return;
+    if (message.author.bot) return;
+    if (!message.guild) return;
+    if (message.channel.type !== ChannelType.GuildText) return;
+    
+    // check if it mentions the bot
+    if (!message.mentions.has(client.user.id)) return;
+
+    let member = message.member as GuildMember;
+    let channel = message.channel as GuildTextBasedChannel;
+
+    // replace the mention with nothing and trim the message, removing double spaces too
+    let text = escapeDiscordMarkdown(message.content.replace("<@" + client.user.id + ">", "").replace(/ +/g, " ").trim());
+    console.log(text);
+    
+    for (const [, command] of mentionCommands) {
+      console.log(command.NAME_DUMB);
+      if (command.matches(text)) {
+        console.log(command.NAME_DUMB);
+        if (isCommandLimited(member, command, command.NAME_DUMB, channel)) return;
+        if (isOnCooldown(member.id, command.NAME_DUMB)) return;
+        if (isOnCooldown(member.id)) return;
+        
+        setOnCooldown(message.member.id, command.NAME_DUMB, command.cooldown);
+        addLimits(message.member, command, command.NAME_DUMB, message.channel);
+
+        try {
+          await command.execute(message, text);
+        } catch (error) {
+          console.error(error);
+        }
+        return;
+      }
+    }
+  });
 
   client.on(Events.InteractionCreate, async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
@@ -185,35 +246,78 @@ export function registerClientAsCommandHandler(client: Client, commandFolder: st
     if (!command) return;
 
     if (isCommandLimited(member, command, commandName, interaction.channel)) {
-      const timeLeft = Math.ceil(getLimitTime(member, commandName) / 1000 + 1);
+      const finishedTimestamp = Math.ceil((Date.now() + getLimitTime(member, commandName)) / 1000);
+      let limitTime = getLimitTime(member, commandName);
+      let subCommand = interaction.options.getSubcommand(false);
+      let commandFormat = interaction.commandName + (subCommand ? " " + subCommand : "");
+
       replyToInteraction(
         interaction,
         "Limit",
-        "\n• You've used this command too much! You can use it again in " + secondsToEnglish(timeLeft) + ".",
+        "\n• You've used this command too much! You can use it again <t:" + finishedTimestamp + ":R>.",
         false
       );
+
+      if (limitTime < 20 * 1000) {
+        setTimeout(() => {
+          editInteractionReply(
+            interaction,
+            "Limit",
+            "\n• You can now use </" + commandFormat + ":" + interaction.commandId + ">.",
+            false
+          )
+        }, limitTime + Math.random() * 750);
+      }
       return;
     }
 
     if (isOnCooldown(interaction.user.id, commandName)) {
       // TODO Could personalize this message depending on the bot's personality
-      const timeLeft = Math.ceil(getCooldown(interaction.user.id, commandName) / 1000 + 1);
+      const finishedTimestamp = Math.ceil(commandCooldown.get(interaction.user.id + commandName) / 1000);
+      let cooldownTime = getCooldown(interaction.user.id, commandName);
+      let subCommand = interaction.options.getSubcommand(false);
+      let commandFormat = interaction.commandName + (subCommand ? " " + subCommand : "");
+
       replyToInteraction(
         interaction,
         "Cooldown",
-        "\n• Hold on! You can use this command again in " + timeLeft + (timeLeft === 1 ? " second." : " seconds."),
+        "\n• Hold on! You can use this command again <t:" + finishedTimestamp + ":R>.",
         false
       );
+
+      if (cooldownTime < 20 * 1000) {
+        setTimeout(() => {
+          editInteractionReply(
+            interaction,
+            "Cooldown",
+            "\n• You can now use </" + commandFormat + ":" + interaction.commandId + ">.",
+            false
+          )
+        }, cooldownTime);
+      }
       return;
     } else if (isOnCooldown(interaction.user.id)) {
       if (COOLDOWN_TIME > 2750) {
-        const timeLeft = Math.ceil(getCooldown(interaction.user.id) / 1000 + 1);
+        const finishedTimestamp = Math.ceil(commandCooldown.get(interaction.user.id) / 1000);
+        let cooldownTime = getCooldown(interaction.user.id);
+
         replyToInteraction(
           interaction,
           "Cooldown",
-          "\n• Hold on! You can use another command in " + timeLeft + (timeLeft === 1 ? " second." : " seconds."),
+          "\n• Hold on! You can use another command <t:" + finishedTimestamp + ":R>.",
           false
         );
+
+        if (cooldownTime < 20 * 1000) {
+          setTimeout(() => {
+            editInteractionReply(
+              interaction,
+              "Cooldown",
+              "\n• You can now use commands again.",
+              false
+            )
+          }, cooldownTime);
+        }
       } else {
         replyToInteraction(
           interaction,
@@ -233,12 +337,17 @@ export function registerClientAsCommandHandler(client: Client, commandFolder: st
       await command.execute(interaction, preferBroadcast);
     } catch (error) {
       console.error(error);
-      await replyToInteraction(
-        interaction,
-        "Error",
-        "\n• Sorry, an error occurred while running that command.",
-        preferBroadcast
-      );
+      try {
+        await replyToInteraction(
+          interaction,
+          "Error",
+          "\n• Sorry, an error occurred while running that command.",
+          preferBroadcast
+        );
+      } catch (error) {
+        // we're really in deep now
+        console.error(error);
+      }
     }
   });
 
@@ -249,12 +358,21 @@ function isBroadcastChannel(channel: GuildTextBasedChannel) {
   return channel.name == "lame-bots";
 }
 
+export function getInteractionContent(interaction: CommandInteraction, header: string, response: string, broadcast: boolean) {
+  return "**" + header + " *｡✲ﾟ ——**" +
+  (broadcast ? "\n\n<@" + interaction.user.id + ">" : "") +
+  "\n" + response;
+}
+
 export async function replyToInteraction(interaction: CommandInteraction, header: string, response: string, broadcast: boolean) {
   await interaction.reply({
-    content:
-      "**" + header + " *｡✲ﾟ ——**" +
-      (broadcast ? "\n\n<@" + interaction.user.id + ">" : "") +
-      "\n" + response,
+    content: getInteractionContent(interaction, header, response, broadcast),
     ephemeral: !broadcast,
+  });
+}
+
+export async function editInteractionReply(interaction: CommandInteraction, header: string, response: string, broadcast: boolean) {
+  await interaction.editReply({
+    content: getInteractionContent(interaction, header, response, broadcast),
   });
 }

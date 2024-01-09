@@ -170,7 +170,7 @@ export function solvePromptWithTimeout(promptRegex, timeout, user): Promise<any>
   if (user) solverCache.add(user);
 
   return new Promise((resolve, reject) => {
-    const worker = fork(path.join(__dirname, "solve-worker.ts"));
+    const worker = fork(path.join(__dirname, "solve-worker"));
 
     let timeoutId = setTimeout(() => {
       worker.kill();

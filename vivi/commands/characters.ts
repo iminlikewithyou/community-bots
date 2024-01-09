@@ -1,5 +1,5 @@
 import { randomInt } from "crypto";
-import { CommandInteraction, SlashCommandBuilder } from "discord.js";
+import { ChatInputCommandInteraction, SlashCommandBuilder } from "discord.js";
 import { replyToInteraction } from "../../src/command-handler";
 import { escapeDiscordMarkdown, formatNumber } from "../../src/utils";
 
@@ -19,7 +19,7 @@ export const data = new SlashCommandBuilder()
 
 export const broadcastable = true;
 
-export async function execute(interaction: CommandInteraction, preferBroadcast: boolean) {
+export async function execute(interaction: ChatInputCommandInteraction, preferBroadcast: boolean) {
   let query = interaction.options.get("query").value as string;
 
   let characterCount = query.length;

@@ -48,3 +48,11 @@ export function shuffle(array) {
 export function escapeDiscordMarkdown(string: string) {
   return string.replace(/[\\`_~\*\|:#@><-]/g, "\\$&");
 }
+
+export const SortingFunctions = {
+  lengthDescending: (a, b) => b.length - a.length,
+  lengthAscending: (a, b) => a.length - b.length,
+  alphabetical: (a, b) => a.localeCompare(b),
+  // we dont need EVERY variation right now, this works fine, if you need more just add them...
+  lengthThenAlphabetical: (a, b) => b.length - a.length || a.localeCompare(b),
+}
