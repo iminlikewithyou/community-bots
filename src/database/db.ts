@@ -70,10 +70,11 @@ export async function getProfile(user) {
 }
 
 type Cash = {
-  cash: number;
+  amount: number;
   name: string;
   appearsBeforeAmount: boolean;
-  display: string;
+  displayAmount: string;
+  displayFor: (amount: number) => string;
 };
 
 export async function getCash(user): Promise<Cash> {
@@ -81,15 +82,18 @@ export async function getCash(user): Promise<Cash> {
 
   // set up some defaults
   let cash = {
-    cash: 0,
+    amount: 0,
     name: " Cash",
     appearsBeforeAmount: false,
-    display: ""
+    displayAmount: "",
+    displayFor: (amount: number) => {
+      return (cash.appearsBeforeAmount ? cash.name : "") + formatNumber(amount) + (cash.appearsBeforeAmount ? "" : cash.name);
+    }
   };
 
   // fill in the cash object
   if (profile.cash) {
-    cash.cash = profile.cash;
+    cash.amount = profile.cash;
   }
   if (profile.cashName) {
     cash.name = profile.cashName.name;
@@ -97,7 +101,7 @@ export async function getCash(user): Promise<Cash> {
   }
 
   // set the display
-  cash.display = (cash.appearsBeforeAmount ? cash.name : "") + formatNumber(cash.cash) + (cash.appearsBeforeAmount ? "" : cash.name);
+  cash.displayAmount = cash.displayFor(cash.amount);
 
   return cash;
 }
