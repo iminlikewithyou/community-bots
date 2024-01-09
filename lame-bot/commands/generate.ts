@@ -294,11 +294,11 @@ export async function execute(interaction: CommandInteraction, preferBroadcast: 
   const timeTaken = formatNumber(endTime - startTime);
 
   for (let i = -1; i < highestLetterCount; i++) {
-    let content = "Rolling for " + totalPay + " cash • **" + roundedMultiplier + "x**..";
+    let content = "Rolling for " + userCash.displayFor(totalPay) + " • **" + roundedMultiplier + "x**..";
 
     if (i == highestLetterCount - 1) {
       let net = totalPayout - totalPay;
-      content += " **" + (net > 0 ? "+" : "") + net + " cash**";
+      content += " **" + (net > 0 ? "+" : "") + userCash.displayFor(net) + "**";
     }
 
     content += "\n\n";
