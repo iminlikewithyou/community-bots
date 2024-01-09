@@ -28,6 +28,6 @@ export async function execute(interaction: CommandInteraction, preferBroadcast: 
   await addCash(interaction.user.id, liftTo - userCash.amount);
 
   await interaction.reply({
-    content: "<@" + interaction.user.id + "> is broke!\nThey have been given **" + formatNumber(liftTo - userCash.amount) + "**!"
+    content: "<@" + interaction.user.id + "> is broke!\nThey have been given **" + userCash.displayFor(liftTo - userCash.amount) + "**!"
   });
 }
