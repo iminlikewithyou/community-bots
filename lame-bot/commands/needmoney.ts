@@ -16,18 +16,18 @@ export async function execute(interaction: CommandInteraction, preferBroadcast: 
   const liftTo = 100;
 
   let userCash = await getCash(interaction.user.id);
-  if (userCash > claim) {
+  if (userCash.amount > claim) {
     await replyToInteraction(
       interaction,
       "Declare Yourself Broke",
-      "\n• You need less than " + claim + " cash to claim that you're broke. You have " + formatNumber(userCash) + " cash.",
+      "\n• You need less than " + userCash.displayFor(claim) + " to claim that you're broke. You have " + userCash.displayAmount + ".",
       false
     );
     return;
   }
-  await addCash(interaction.user.id, liftTo - userCash);
+  await addCash(interaction.user.id, liftTo - userCash.amount);
 
   await interaction.reply({
-    content: "<@" + interaction.user.id + "> is broke!\nThey have been given **" + formatNumber(liftTo - userCash) + " cash**!"
+    content: "<@" + interaction.user.id + "> is broke!\nThey have been given **" + formatNumber(liftTo - userCash.amount) + "**!"
   });
 }
