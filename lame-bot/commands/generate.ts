@@ -326,7 +326,7 @@ export async function execute(interaction: CommandInteraction, preferBroadcast: 
       }
 
       if (slotComplete) {
-        content += " • $" + (slot.payout > 0 ? slot.payout + " • **JACKPOT!!**" : "0");
+        content += " • " + (slot.payout > 0 ? userCash.displayFor(slot.payout) + " • **JACKPOT!!**" : "Too bad..");
       } else {
         content += " • " + formatNumber(possibilityCount) + " possibilit" + (possibilityCount == 1 ? "y" : "ies");
       }
