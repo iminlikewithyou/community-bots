@@ -1,6 +1,35 @@
 import appRootPath from "app-root-path";
 import fs from "fs";
 
+/*
+  Using a ModuleConfig allows us to disable a module and re-enable it later without losing the configuration.
+  For now, the configuration is just the bot name that the module uses.
+  When re-enabling a module, the bot name will be the same as it was when it was disabled.
+*/
+interface ModuleConfig {
+  enabled: boolean
+  botName?: string
+}
+
+interface Config {
+  singleton: {
+    enabled: boolean
+    botName?: string
+  }
+  modules: {
+    [module: string]: ModuleConfig
+  }
+}
+
+interface TokenConfig {
+  [botName: string]: {
+    id: string
+    token: string
+    secret: string
+    accessToken: any
+  }
+}
+
 /**
  * The path to the JSON file containing the Community Bots configuration.
  */
@@ -11,18 +40,51 @@ const CONFIG_PATH = appRootPath.resolve("config/config.json");
  */
 const TOKENS_PATH = appRootPath.resolve("config/tokens.json");
 
-// TODO: give it nice types? or should we just not export it and just use functions for everything?
 /**
  * The configuration for Community Bots.
  * 
  * **DON'T MODIFY THIS VARIABLE DIRECTLY UNLESS YOU ARE A COMPLETE FUCKING IDIOT**
  */
-export const config = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
+export let config: Config;
+
+// check if CONFIG_PATH exists
+if (fs.existsSync(CONFIG_PATH)) {
+  // The configuration exists, let's try to parse it.
+  try {
+    config = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf-8"));
+  } catch (error) {
+    console.log("Community Bots failed to read the configuration!");
+    throw error;
+  }
+} else {
+
+}
 
 /**
  * The token configuration of the bots.
  */
-export const tokens = JSON.parse(fs.readFileSync(TOKENS_PATH, "utf8"));
+export const tokens: TokenConfig = JSON.parse(fs.readFileSync(TOKENS_PATH, "utf8"));
+
+/**
+ * Sets the default values for the configuration if they don't exist.
+ */
+function setConfigDefaults() {
+  if (!config.singleton.enabled) {
+    config.singleton.enabled = false;
+  }
+  if (!config.singleton.botName) {
+    config.singleton.botName = undefined;
+  }
+  Object.keys(config.modules).forEach((module) => {
+    if (!config.modules[module].enabled) {
+      config.modules[module].enabled = false;
+    }
+    if (!config.modules[module].botName) {
+      config.modules[module].botName = undefined;
+    }
+  });
+  saveConfig();
+}
 
 /**
  * Writes the current configuration to the JSON file.
@@ -40,33 +102,33 @@ function saveTokens() {
 
 /**
  * Sets whether or not Community Bots will use singleton mode when it starts up.
+ * If singleton is enabled, but there is an invalid singleton.botName set, it will prompt the user to set a valid bot name.
  * 
  * This will also save the configuration to the JSON file.
  * 
  * @param enabled Whether or not to enable singleton mode
  */
 export function setSingletonEnabled(enabled: boolean) {
-  config.singleton = enabled;
+  config.singleton.enabled = enabled;
   saveConfig();
 }
 
 /**
  * Sets the bot to use as the singleton bot if Community Bots is in singleton mode.
- * If this bot name isn't found in the list of bots when Community Bots starts up, it will prompt the user to add it.
+ * If the bot name is invalid when Community Bots starts up, it will prompt the user to set a valid bot name.
  * 
  * This will also save the configuration to the JSON file.
  * 
- * @param bot The identifier of the bot to set as the singleton bot
+ * @param botName The identifier of the bot to set as the singleton bot
  */
-export function setSingletonBot(bot: string) {
-  config.singletonBot = bot;
+export function setSingletonBot(botName: string) {
+  config.singleton.botName = botName;
   saveConfig();
 }
 
 /**
  * Sets whether or not a module is enabled.
- * 
- * **NOTE:** If the module's configuration hasn't been set up yet, this won't do anything.
+ * If this module is enabled, but the module.botName is invalid, it will prompt the user to set a valid bot name.
  * 
  * This will also save the configuration to the JSON file.
  * 
@@ -75,14 +137,13 @@ export function setSingletonBot(bot: string) {
  */
 export function setModuleEnabled(module: string, enabled: boolean) {
   // TODO: check if the module is set up
-  config.modules[module] = enabled;
+  config.modules[module].enabled = enabled;
   saveConfig();
 }
 
 /**
  * Sets the bot to use for a module.
- * 
- * **NOTE:** If the module's configuration hasn't been set up yet, this won't do anything.
+ * If the bot name is invalid when Community Bots starts up, it will prompt the user to set a valid bot name.
  * 
  * This will also save the configuration to the JSON file.
  * 
@@ -90,13 +151,8 @@ export function setModuleEnabled(module: string, enabled: boolean) {
  * @param bot The identifier of the bot to set as the module's bot
  */
 export function setModuleBot(module: string, bot: string) {
-  config.moduleBots[module] = bot;
+  config.modules[module].botName = bot;
   saveConfig();
-}
-
-type ModuleConfig = {
-  bot: string,
-  enabled: boolean
 }
 
 /**
