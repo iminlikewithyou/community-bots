@@ -12,13 +12,9 @@ function isDirectoryEmpty(directoryPath: string): boolean {
   return files.length === 0;
 }
 
-// Find which modules are available
-// it may even be better in the future if it detected the modules by entering the index file or something similar
-// rather than just checking if there's a file within the directory ?
-const modules: string[] = [];
-fs.readdirSync(MODULES_PATH).forEach(file => {
-  if (isDirectoryEmpty(`${MODULES_PATH}/${file}`)) return;
-  modules.push(file);
+// Find which modules are available by filtering out the empty directories
+const modules: string[] = fs.readdirSync(MODULES_PATH).filter(file => {
+  return !isDirectoryEmpty(`${MODULES_PATH}/${file}`)
 });
 
 console.log('Available modules:', modules);
