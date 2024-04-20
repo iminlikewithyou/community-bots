@@ -1,2 +1,4 @@
-require("./client");
-require("./word-bomb-mini");
+import("./client");
+import("./word-bomb-mini");
+
+export default {};

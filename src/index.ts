@@ -1,6 +1,7 @@
-require("dotenv").config();
+import dotenv from "dotenv";
+dotenv.config();
 
-require("../vivi/src/index");
-require("../lame-bot/src/index");
+import("../vivi/src/index");
+import("../lame-bot/src/index");
 
-require("./sleuth");
+import("./sleuth");

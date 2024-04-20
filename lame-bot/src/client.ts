@@ -1,7 +1,10 @@
 import { ActivityType, Channel, Client, GatewayIntentBits, Guild, GuildTextBasedChannel, Message, Partials } from "discord.js";
-
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { registerClientAsCommandHandler } from "../../src/command-handler";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export const lameBotClient: Client = new Client({
   intents: [

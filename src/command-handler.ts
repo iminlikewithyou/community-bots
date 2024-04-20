@@ -2,6 +2,8 @@ import { REST } from "@discordjs/rest";
 import { ChannelType, Client, Collection, CommandInteraction, Events, GuildMember, GuildTextBasedChannel, Message, Routes } from "discord.js";
 import fs from "node:fs";
 import { escapeDiscordMarkdown } from "./utils";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 const COOLDOWN_TIME = 2000;
 const commandCooldown = new Map();
@@ -136,7 +138,7 @@ function secondsToEnglish(seconds: number) {
   return seconds + (seconds === 1 ? " second" : " seconds");
 }
 
-export function registerClientAsCommandHandler(client: Client, commandFolder: string, clientID: string, token: string) {
+export async function registerClientAsCommandHandler(client: Client, commandFolder: string, clientID: string, token: string) {
   const commands: Collection<string, BotCommand> = new Collection();
   const mentionCommands: Collection<string, MentionCommand> = new Collection();
 
@@ -156,7 +158,10 @@ export function registerClientAsCommandHandler(client: Client, commandFolder: st
   };
 
   for (const file of commandFiles) {
-    const command = require(`${commandFolder}/${file}`);
+    const commandPath = path.join(commandFolder, file);
+    const commandFileURL = pathToFileURL(commandPath).href;
+
+    const command = await import(commandFileURL);
     // check if data and execute are defined in command
     if (command.data && command.execute) {
       const commandJSON = command.data.toJSON();
@@ -171,7 +176,10 @@ export function registerClientAsCommandHandler(client: Client, commandFolder: st
   }
 
   for (const file of mentionCommandFiles) {
-    const command = require(`${commandFolder}/mentions/${file}`);
+    const commandPath = path.join(commandFolder, "mentions", file);
+    const commandFileURL = pathToFileURL(commandPath).href;
+
+    const command = await import(commandFileURL);
     // check if matches and execute are defined in command
     if (command.matches && command.execute) {
       mentionCommands.set(command.NAME_DUMB, command);

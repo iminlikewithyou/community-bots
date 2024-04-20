@@ -1,8 +1,12 @@
-import { Client, GatewayIntentBits, ActivityType } from 'discord.js';
+import { ActivityType, Client, GatewayIntentBits } from 'discord.js';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { registerClientAsCommandHandler } from '../../src/command-handler';
 import { getWordsInDictionary } from '../../src/dictionary/dictionary';
 import { formatNumberShorthand } from '../../src/utils';
-import path from 'node:path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export const viviClient = new Client({
   intents: [
@@ -29,6 +33,11 @@ viviClient.on('ready', () => {
 
 //
 
-registerClientAsCommandHandler(viviClient, path.join(__dirname, '../commands'), process.env.VIVI_CLIENT_ID, process.env.VIVI_TOKEN);
+registerClientAsCommandHandler(
+  viviClient,
+  path.join(__dirname, '../commands'),
+  process.env.VIVI_CLIENT_ID,
+  process.env.VIVI_TOKEN
+);
 
 //

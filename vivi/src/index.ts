@@ -1,1 +1,3 @@
-require("./client");
+import("./client");
+
+export default {};
