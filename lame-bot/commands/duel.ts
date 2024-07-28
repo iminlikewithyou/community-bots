@@ -50,7 +50,7 @@ export async function execute(interaction: CommandInteraction, preferBroadcast: 
   let gameName = interaction.options.get("game")?.name ?? "Word Bomb";
 
   if (user === interaction.user) {
-    replyToInteraction(interaction, "Duel", "\n• You can't duel yourself!", false);
+    await replyToInteraction(interaction, "Duel", "\n• You can't duel yourself!", false);
     return;
   }
 
@@ -66,9 +66,9 @@ export async function execute(interaction: CommandInteraction, preferBroadcast: 
     );
   } catch (err) {
     console.error(err);
-    replyToInteraction(interaction, "Duel", "\n• Sorry, I couldn't send a DM to that user!", false);
+    await replyToInteraction(interaction, "Duel", "\n• Sorry, I couldn't send a DM to that user!", false);
     return;
   }
   
-  replyToInteraction(interaction, "Duel", "\n• Sent a duel request to <@" + user.id + ">!\nClick to join the [reserved server](" + link + ").", false);
+  await replyToInteraction(interaction, "Duel", "\n• Sent a duel request to <@" + user.id + ">!\nClick to join the [reserved server](" + link + ").", false);
 }

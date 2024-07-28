@@ -3,7 +3,8 @@ import { getInteractionContent, replyToInteraction } from '../../src/command-han
 import { SortingFunctions, formatNumber, shuffle } from '../../src/utils';
 
 import { solvePromptWithTimeout } from '../../src/dictionary/dictionary';
-import { convertTextToHighlights, getPromptRegexFromPromptSearch } from '../../src/regex';
+import { getPromptRegexFromPromptSearch } from '../../src/regex';
+import { Highlighters } from '../../src/themes/highlighter';
 
 export const data = new SlashCommandBuilder()
   .setName('solve')
@@ -38,12 +39,22 @@ export const data = new SlashCommandBuilder()
         value: 'lengthThenAlphabetical'
       }));
 
+export const JSON = data.toJSON();
+const extras = {
+  "integration_types": [0, 1],
+  "contexts": [0, 1, 2]
+}
+Object.keys(extras).forEach(key => JSON[key] = extras[key]);
+
 export const broadcastable = true;
 
 // create function to handle the command
 export async function execute(interaction: CommandInteraction, preferBroadcast: boolean) {
   let prompt = interaction.options.get("prompt").value as string;
   let sorting: string = interaction.options.get("sorting")?.value as string ?? "None";
+
+  const isHomeServer = interaction.guildId === process.env.GUILD_ID;
+  const highlighter = isHomeServer ? Highlighters.Default : Highlighters.Vivi;
 
   try {
     let regex = getPromptRegexFromPromptSearch(prompt);
@@ -79,7 +90,7 @@ export async function execute(interaction: CommandInteraction, preferBroadcast: 
       for (let i = 0; i < Math.min(solutions.length, 4); i++) {
         let solution = solutions[i];
 
-        let solutionString = '\n• ' + convertTextToHighlights(solution, regex);
+        let solutionString = '\n• ' + highlighter.highlight(solution, regex);
         if (solutionsLength + solutionString.length > 1910) break;
         solutionStrings.push(solutionString);
         solutionsLength += solutionString.length;

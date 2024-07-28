@@ -24,8 +24,9 @@ import {
   solverCache
 } from "../../src/dictionary/dictionary";
 import { getRemarkEmoji, getStreakNumbers } from "../../src/emoji-renderer";
-import { convertTextToHighlights, escapeRegExp, getPromptRegexDisplayText, getPromptRepeatableText } from "../../src/regex";
-import { createEnglishList, escapeDiscordMarkdown, formatNumber, formatPercentage, formatPlacement } from "../../src/utils";
+import { escapeRegExp, getPromptRegexDisplayText, getPromptRepeatableText } from "../../src/regex";
+import { Highlighters } from "../../src/themes/highlighter";
+import { createEnglishList, escapeDiscordMarkdown, formatNumber, formatPercentage, formatPlacement, getCleanName } from "../../src/utils";
 import { getChannel, getGuild, lameBotClient, sendMessage, sendMessageAsReply } from "./client";
 
 let guild;
@@ -83,7 +84,7 @@ function isNumberVowelSound(x) {
 
 function getCurrentPromptName() {
   return (
-    getPromptRegexDisplayText(prompt, false) +
+    getPromptRegexDisplayText(prompt) +
     (lengthRequired ? " - " + promptWord.length : "")
   );
 }
@@ -127,7 +128,7 @@ async function startRound() {
     replyMessage,
     (
       getRemarkEmoji("bomb") + " **Quick!** Type a word containing:" +
-      "\n\n" + getPromptRegexDisplayText(prompt) + " ***｡✲ﾟ** (" + formatNumber(solutions) + (solutions === 1 ? " solution)" : " solutions)") +
+      "\n\n" + getPromptRegexDisplayText(prompt, Highlighters.Default) + " ***｡✲ﾟ** (" + formatNumber(solutions) + (solutions === 1 ? " solution)" : " solutions)") +
       (lengthRequired ? "\n\n• Must be **" + promptWord.length + "** characters!" : "")
     )
   );
@@ -162,18 +163,6 @@ async function startRound() {
   console.log("Starting the round..");
   await startRound();
 })();
-
-function getCleanName(name) {
-  let cleanName = escapeDiscordMarkdown(name.replace(/﷽𒐫𒈙⸻꧅ဪ௵௸/g, ""));
-  if (cleanName === "") {
-    if (name.length === 0) {
-      return "Lame Member";
-    } else {
-      return "\\" + name[0];
-    }
-  }
-  return cleanName;
-}
 
 async function getDisplayName(userID) {
   return await guild.members
@@ -647,7 +636,7 @@ async function endRound() {
     )} <@${winnerUser}> solved it! ${getRemarkEmoji("solvedIt")}**\n\n` +
       getRemarkEmoji("roundEnded") +
       " **Round ended!**\n" +
-      convertTextToHighlights(winnerSolution, prompt) +
+      Highlighters.Default.highlight(winnerSolution, prompt) +
       "\n" +
       getRemarkText()
   );

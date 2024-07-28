@@ -1,5 +1,5 @@
 import { REST } from "@discordjs/rest";
-import { ChannelType, Client, Collection, CommandInteraction, Events, GuildMember, GuildTextBasedChannel, Message, Routes } from "discord.js";
+import { ChannelType, Client, Collection, CommandInteraction, Events, GuildMember, GuildTextBasedChannel, InteractionReplyOptions, Message, MessageMentionOptions, Routes } from "discord.js";
 import fs from "node:fs";
 import { escapeDiscordMarkdown } from "./utils";
 import path from "node:path";
@@ -74,6 +74,7 @@ function getCommandLimitsFor(member: GuildMember, command: BaseCommand): Command
 }
 
 function areLimitsIgnored(limit: CommandLimit, channel: GuildTextBasedChannel) {
+  if (channel.guildId !== process.env.GUILD_ID) return true;
   if (limit.includeBotsChannel) return false;
   return channel.name.toLowerCase().includes("roll") || isBroadcastChannel(channel);
 }
@@ -154,6 +155,8 @@ export async function registerClientAsCommandHandler(client: Client, commandFold
   let broadcastCommand = {
     name: "shout",
     description: "Broadcast a command!",
+    "integration_types": [0, 1],
+    "contexts": [0, 1, 2],
     options: [],
   };
 
@@ -164,7 +167,7 @@ export async function registerClientAsCommandHandler(client: Client, commandFold
     const command = await import(commandFileURL);
     // check if data and execute are defined in command
     if (command.data && command.execute) {
-      const commandJSON = command.data.toJSON();
+      const commandJSON = command.JSON ?? command.data.toJSON();
 
       commands.set(command.data.name, command);
       JSONcommands.push(commandJSON);
@@ -191,9 +194,16 @@ export async function registerClientAsCommandHandler(client: Client, commandFold
   const rest = new REST({ version: "10" }).setToken(token);
   (async () => {
     try {
+      const EMPTY = [];
+      const applicationCommands = process.env.NODE_ENV === "development" ? EMPTY : JSONcommands;
+      const applicationGuildCommands = process.env.NODE_ENV === "development" ? JSONcommands : EMPTY;
       await rest.put(
         Routes.applicationGuildCommands(clientID, process.env.GUILD_ID),
-        { body: JSONcommands }
+        { body: applicationGuildCommands }
+      );
+      await rest.put(
+        Routes.applicationCommands(clientID),
+        { body: applicationCommands }
       );
     } catch (error) {
       console.error(error);
@@ -250,30 +260,34 @@ export async function registerClientAsCommandHandler(client: Client, commandFold
     const command = commands.get(commandName);
     if (!command) return;
 
-    if (isCommandLimited(member, command, commandName, interaction.channel)) {
-      const finishedTimestamp = Math.ceil((Date.now() + getLimitTime(member, commandName)) / 1000);
-      let limitTime = getLimitTime(member, commandName);
-      let subCommand = interaction.options.getSubcommand(false);
-      let commandFormat = interaction.commandName + (subCommand ? " " + subCommand : "");
+    const followLimits = interaction.guildId === process.env.GUILD_ID;
 
-      replyToInteraction(
-        interaction,
-        "Limit",
-        "\n• You've used this command too much! You can use it again <t:" + finishedTimestamp + ":R>.",
-        false
-      );
-
-      if (limitTime < 20 * 1000) {
-        setTimeout(() => {
-          editInteractionReply(
-            interaction,
-            "Limit",
-            "\n• You can now use </" + commandFormat + ":" + interaction.commandId + ">.",
-            false
-          )
-        }, limitTime + Math.random() * 750);
+    if (followLimits) {
+      if (isCommandLimited(member, command, commandName, interaction.channel)) {
+        const finishedTimestamp = Math.ceil((Date.now() + getLimitTime(member, commandName)) / 1000);
+        let limitTime = getLimitTime(member, commandName);
+        let subCommand = interaction.options.getSubcommand(false);
+        let commandFormat = interaction.commandName + (subCommand ? " " + subCommand : "");
+  
+        replyToInteraction(
+          interaction,
+          "Limit",
+          "\n• You've used this command too much! You can use it again <t:" + finishedTimestamp + ":R>.",
+          false
+        );
+  
+        if (limitTime < 20 * 1000) {
+          setTimeout(() => {
+            editInteractionReply(
+              interaction,
+              "Limit",
+              "\n• You can now use </" + commandFormat + ":" + interaction.commandId + ">.",
+              false
+            )
+          }, limitTime + Math.random() * 750);
+        }
+        return;
       }
-      return;
     }
 
     if (isOnCooldown(interaction.user.id, commandName)) {
@@ -336,7 +350,9 @@ export async function registerClientAsCommandHandler(client: Client, commandFold
 
     
     setOnCooldown(interaction.user.id, commandName, command.cooldown);
-    addLimits(member, command, commandName, interaction.channel);
+    if (followLimits) {
+      addLimits(member, command, commandName, interaction.channel);
+    }
 
     try {
       await command.execute(interaction, preferBroadcast);
@@ -360,7 +376,8 @@ export async function registerClientAsCommandHandler(client: Client, commandFold
 }
 
 function isBroadcastChannel(channel: GuildTextBasedChannel) {
-  return channel.name == "lame-bots";
+  if (!channel) return false;
+  return channel.name.toLowerCase().includes("bot");
 }
 
 /**
@@ -390,10 +407,15 @@ export function getInteractionContent(interaction: CommandInteraction, header: s
  * @param response The response text.
  * @param broadcast Whether or not this interaction is being broadcasted.
  */
-export async function replyToInteraction(interaction: CommandInteraction, header: string, response: string, broadcast: boolean) {
+export async function replyToInteraction(interaction: CommandInteraction, header: string, response: string, broadcast: boolean, options?: Partial<InteractionReplyOptions>) {
+  if (interaction.replied) {
+    return;
+  }
+  
   await interaction.reply({
     content: getInteractionContent(interaction, header, response, broadcast),
     ephemeral: !broadcast,
+    ...options
   });
 }
 
@@ -409,6 +431,10 @@ export async function replyToInteraction(interaction: CommandInteraction, header
  * @param broadcast Whether or not this interaction is being broadcasted.
  */
 export async function editInteractionReply(interaction: CommandInteraction, header: string, response: string, broadcast: boolean) {
+  if (!interaction.replied) {
+    return;
+  }
+
   await interaction.editReply({
     content: getInteractionContent(interaction, header, response, broadcast),
   });

@@ -1,5 +1,5 @@
 import { PromptException, standardizeWord } from "./dictionary/dictionary";
-import { getPresentEmojis, getHighlightedEmojis, getWildcardEmojis } from "./emoji-renderer";
+import { Highlighter } from "./themes/highlighter";
 
 /*
   Parts of the regex
@@ -76,7 +76,7 @@ function trimArrows(string: string): string {
   return string.replace(/^<|>$/g, "");
 }
 
-const invalidPromptSearchRegex = /[^A-Z0-9'\-@.? ]/;
+const invalidPromptSearchRegex = /[^A-Z0-9'\-@.? ]/i;
 
 /**
  * A regular expression used to determine if a search is regex or not.
@@ -394,87 +394,33 @@ export function getHighlightedLetters(solution: string, regex: RegExp): Letters[
 }
 
 /**
- * Conversion function to turn a Letters Array into a string with the letters converted to emoji letters
- * 
- * @param letters A Letters array to convert
- * @returns A string with the letters converted to emoji letters
- */
-export function convertLettersToEmojiLetters(letters: Letters[]): string {
-  let emojiString = "";
-  for (let text of letters) {
-    switch (text.letterType) {
-      case "highlighted":
-        emojiString += getHighlightedEmojis(text.text);
-        break;
-      case "present":
-        emojiString += getPresentEmojis(text.text);
-        break;
-      case "wildcard":
-      default:
-        emojiString += getWildcardEmojis(text.text);
-        break;
-    }
-  }
-
-  return emojiString;
-}
-
-/**
- * Conversion function to turn a Letters Array into a string with the letters converted to text
- * 
- * @param letters A Letters array to convert
- * @returns A string with the letters converted to text
- */
-export function convertLettersToText(letters: Letters[]): string {
-  let textString = "";
-  for (let text of letters) {
-    textString += text.letterType ? `**${text.text}**` : text.text;
-  }
-
-  return textString;
-}
-
-/**
- * Converts a string to a string with the letters converted to emojis or text based on the highlight parameter
- * 
- * @param text A string to convert
- * @param regex A regex to use to highlight the string
- * @param highlight If the string should be emojis (default: true)
- * @returns A string with the letters converted for highlighting
- */
-export function convertTextToHighlights(text: string, regex: RegExp, highlight: boolean = true): string {
-  regex = setHighlightGroups(regex);
-  let letters = getHighlightedLetters(text, regex);
-  return highlight ? convertLettersToEmojiLetters(letters) : convertLettersToText(letters);
-}
-
-/**
  * Regular expression used to check if the prompt display contains any invalid characters. Only uppercase letters, numbers, apostrophes, hyphens, at symbols, and spaces are considered valid.
  */
-const invalidPromptDisplayRegex = /[^A-Z0-9'\-@ ]/;
+const invalidPromptDisplayRegex = /[^A-Z0-9'\-@ ]/i;
 
 /**
  * This function will take a regex as input and return either a prompt-like display string or a regex encapsulated in backticks.
  * 
- * If fancy is true, it is expected for use in a place such as a Discord text channel.
- * The prompt display string will use white letters emojis, and the regex will be encapsulated in backticks (`).
+ * If a Highlighter is passed, it is expected for use in a place such as a Discord text channel.
+ * The prompt display string will use the present letter emojis, and the regex will be encapsulated in backticks (`).
  * 
- * If fancy is false, it is expected for use in a place such as a Discord presence.
+ * If a Highlighter is not passed, it is expected for use in a place such as a Discord presence.
  * The prompt display string will use normal letters, and the regex will be returned without encapsulation.
  *
  * @param regex The regular expression
+ * @param highlighter The highlighter to use, or undefined if not using a highlighter
  * @returns The display string
  * 
  * @example
  * ```typescript
- * getPromptRegexDisplayText(new RegExp("[A-Z]{3}", "i")); // returns "`/[A-Z]{3}/`"
- * getPromptRegexDisplayText(new RegExp("AB", "i")); // returns AB in white emoji letters
+ * getPromptRegexDisplayText(new RegExp("[A-Z]{3}", "i"), Highlighters.Default); // returns "`/[A-Z]{3}/`"
+ * getPromptRegexDisplayText(new RegExp("AB", "i"), Highlighters.Default); // returns AB in white emoji letters
  * 
- * getPromptRegexDisplayText(new RegExp("[A-Z]{3}", "i"), false); // returns "/[A-Z]{3}/"
- * getPromptRegexDisplayText(new RegExp("AB", "i"), false); // returns "AB"
+ * getPromptRegexDisplayText(new RegExp("[A-Z]{3}", "i")); // returns "/[A-Z]{3}/"
+ * getPromptRegexDisplayText(new RegExp("AB", "i")); // returns "AB"
  * ```
  */
-export function getPromptRegexDisplayText(regex: RegExp, fancy: boolean = true): string {
+export function getPromptRegexDisplayText(regex: RegExp, highlighter?: Highlighter): string {
   // get the string of the regex
   let regexString = regex.source;
 
@@ -484,10 +430,10 @@ export function getPromptRegexDisplayText(regex: RegExp, fancy: boolean = true):
   // check if the regex string has only displayable charaacters.
   // this is not a perfect check, but it should totally be good enough for our purposes
   if (!invalidPromptDisplayRegex.test(displayString)) {
-    return fancy ? getPresentEmojis(displayString) : regexString;
+    return highlighter ? highlighter.getPresent(displayString) : regexString;
   }
 
-  return fancy ? "`/" + regexString + "/`" : "/" + regexString + "/";
+  return highlighter ? "`/" + regexString + "/`" : "/" + regexString + "/";
 }
 
 /**

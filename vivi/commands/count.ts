@@ -4,6 +4,7 @@ import { formatNumber } from '../../src/utils';
 
 import { cleanWord, solvePromptWithTimeout } from '../../src/dictionary/dictionary';
 import { getPromptRegexDisplayText, getPromptRegexFromPromptSearch } from '../../src/regex';
+import { Highlighters } from '../../src/themes/highlighter';
 
 export const data = new SlashCommandBuilder()
   .setName('count')
@@ -21,11 +22,21 @@ export const data = new SlashCommandBuilder()
         value: 'English'
       }));
 
+export const JSON = data.toJSON();
+const extras = {
+  "integration_types": [0, 1],
+  "contexts": [0, 1, 2]
+}
+Object.keys(extras).forEach(key => JSON[key] = extras[key]);
+
 export const broadcastable = true;
 
 // create function to handle the command
 export async function execute(interaction: CommandInteraction, preferBroadcast: boolean) {
   let prompt = interaction.options.get("prompt").value as string;
+
+  const isHomeServer = interaction.guildId === process.env.GUILD_ID;
+  const highlighter = isHomeServer ? Highlighters.Default : Highlighters.Vivi;
   
   try {
     let regex = getPromptRegexFromPromptSearch(prompt);
@@ -39,7 +50,7 @@ export async function execute(interaction: CommandInteraction, preferBroadcast: 
       await replyToInteraction(interaction, "Solve Count",
         '\n• There '
         + (solutions.length === 1 ? 'is **1** solution' : 'are **' + formatNumber(solutions.length) + '** solutions')
-        + ' for ' + getPromptRegexDisplayText(regex) + '.'
+        + ' for ' + getPromptRegexDisplayText(regex, highlighter) + '.'
       , preferBroadcast);
     }
   } catch (error) {

@@ -113,6 +113,25 @@ export function escapeDiscordMarkdown(string: string): string {
     .replace(/[\\_~\*\|:#@><-]/g, "\\$&");
 }
 
+// TODO: write documentation for this
+export function getCleanName(name: string) {
+  let cleanName = escapeDiscordMarkdown(name.replace(/﷽𒐫𒈙⸻꧅ဪ௵௸/g, ""));
+  if (cleanName === "") {
+    if (name.length === 0) {
+      return "Lame Member";
+    } else {
+      return "\\" + name[0];
+    }
+  }
+  return cleanName;
+}
+
+// TODO : Docs
+export function getCleanRoleName(name: string) {
+  let cleanName = name.replace(/﷽𒐫𒈙⸻꧅ဪ௵௸/g, "");
+  return cleanName;
+}
+
 /**
  * A collection of sorting functions for strings.
  */

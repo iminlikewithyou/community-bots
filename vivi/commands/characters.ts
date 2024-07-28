@@ -1,7 +1,8 @@
 import { randomInt } from "crypto";
-import { CommandInteraction, SlashCommandBuilder } from "discord.js";
+import { CommandInteraction } from "discord.js";
 import { replyToInteraction } from "../../src/command-handler";
 import { escapeDiscordMarkdown, formatNumber } from "../../src/utils";
+import { SlashCommandBuilder } from "@discordjs/builders";
 
 export const data = new SlashCommandBuilder()
   .setName("characters")
@@ -16,6 +17,13 @@ export const data = new SlashCommandBuilder()
 //   option.setName('frequency')
 //     .setDescription('Whether or not to calculate character frequency')
 //     .setRequired(false));
+
+export const JSON = data.toJSON();
+const extras = {
+  "integration_types": [0, 1],
+  "contexts": [0, 1, 2]
+}
+Object.keys(extras).forEach(key => JSON[key] = extras[key]);
 
 export const broadcastable = true;
 

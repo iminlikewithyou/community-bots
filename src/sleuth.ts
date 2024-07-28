@@ -66,6 +66,10 @@ export async function assignRole(userID: string, roleID: string): Promise<void> 
   await member.roles.add(roleID);
 }
 
+export async function renameRole(roleID: string, newName: string) {
+  await sleuthClient.guilds.cache.get(process.env.GUILD_ID).roles.cache.get(roleID).setName(newName);
+}
+
 /**
  * Set the icon of a role using Sleuth.
  * 

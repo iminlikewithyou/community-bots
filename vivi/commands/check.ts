@@ -20,6 +20,13 @@ export const data = new SlashCommandBuilder()
         value: 'English'
       }));
 
+export const JSON = data.toJSON();
+const extras = {
+  "integration_types": [0, 1],
+  "contexts": [0, 1, 2]
+}
+Object.keys(extras).forEach(key => JSON[key] = extras[key]);
+
 export const broadcastable = true;
 
 // TODO - this should really be moved
@@ -35,20 +42,24 @@ export async function execute(interaction: CommandInteraction, preferBroadcast: 
     return;
   }
 
+  const isHomeServer = interaction.guildId === process.env.GUILD_ID;
+  const unavailableEmoji = isHomeServer ? "<:Unavailable:1267171561987637248>" : "<:Unavailable:1267171142632738961>";
+  const availableEmoji = isHomeServer ? "<:Available:1267171548712669286>" : "<:Available:1267171118251376731>";
+
   if (word.length > 34) {
     await replyToInteraction(interaction, "Word Status",
       '\n• **' + word.substring(0, 20) + '..'
-      + '\n' + getRemarkEmoji("bad") + ' Too long** to be a valid English word.'
+      + '\n' + unavailableEmoji + ' Too long** to be a valid English word.'
     , preferBroadcast);
   } else if (isWord(word)) {
     await replyToInteraction(interaction, "Word Status",
       '\n• **' + word
-      + '\n' + getRemarkEmoji("good") + ' Available** on live servers.'
+      + '\n' + availableEmoji + ' Available** on live servers.'
     , preferBroadcast);
   } else {
     await replyToInteraction(interaction, "Word Status",
       '\n• **' + word
-      + '\n' + getRemarkEmoji("bad") + ' Not found** in the English dictionary.'
+      + '\n' + unavailableEmoji + ' Not found** in the English dictionary.'
     , preferBroadcast);
   }
 };
