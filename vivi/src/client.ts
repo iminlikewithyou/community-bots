@@ -27,6 +27,10 @@ viviClient.on('ready', () => {
   updatePresence();
 });
 
+viviClient.once('ready', () => {
+  require('./app-emoji/finish-upload');
+});
+
 //
 
 registerClientAsCommandHandler(viviClient, path.join(__dirname, '../commands'), process.env.VIVI_CLIENT_ID, process.env.VIVI_TOKEN);

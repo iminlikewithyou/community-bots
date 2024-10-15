@@ -16,7 +16,7 @@ import { getHighlighterTheme } from "../database/db";
 type HighlightingBots = "vivi" | "unknown";
 
 export class Highlighter {
-  private theme: CharacterTheme;
+  theme: CharacterTheme;
 
   constructor(theme: CharacterTheme) {
     this.theme = theme;
@@ -114,12 +114,12 @@ export class Highlighter {
   }
 
   static async fromCommand(userID: string, guildID: string, fromBot: HighlightingBots): Promise<Highlighter> {
-    if (guildID !== process.env.GUILD_ID) {
-      switch (fromBot) {
-        case "vivi":
-          return Highlighters.Vivi;
-      }
-    }
+    // if (guildID !== process.env.GUILD_ID) {
+    //   switch (fromBot) {
+    //     case "vivi":
+    //       return Highlighters.Vivi;
+    //   }
+    // }
     return Highlighter.fromServerInteraction(userID);
   }
 
@@ -128,7 +128,7 @@ export class Highlighter {
   }
 }
 
-const Highlighters = {
+export const Highlighters = {
   // Themes for OMG
   Default: new Highlighter(DefaultCharacterTheme),
   Caffeinated: new Highlighter(CaffeinatedCharacterTheme),
