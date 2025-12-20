@@ -80,7 +80,7 @@ export async function execute(
 
     const [highlighter, solutions] = await Promise.all([
       Highlighter.fromCommandInteraction(interaction, "vivi"),
-      solvePromptWithTimeout(regex, 1300, null),
+      solvePromptWithTimeout(regex, 2000, null),
     ]);
     let solveCount = solutions.length;
 
