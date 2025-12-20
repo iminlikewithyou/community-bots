@@ -10,11 +10,6 @@
     "outDir": "dist",
     "rootDir": "."
   },
-  "include": [
-    "src/**/*.ts",
-    "lame-bot/**/*.ts",
-    "vivi/**/*.ts",
-    "assets/**/*.ts"
-  ],
+  "include": ["src/**/*.ts", "lame-bot/**/*.ts", "assets/**/*.ts"],
   "exclude": ["node_modules"]
 }
